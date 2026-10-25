@@ -171,15 +171,19 @@ review from the author:
 - the documentation in `docs/` and this README.
 
 **The backends are hand-coded.** Everything under `backends/`, the nginx gateway, and the
-databases, queues and infrastructure behind them are written by the author without AI-generated
-code. That is the point of the project: the backend and system design work is the practice.
+databases, queues and infrastructure behind them are typed by the author. AI never writes or
+edits these files. That is the point of the project: the backend and system design work is the
+practice.
 
 AI may still be used around the backend as a tutor, never as the author:
 
-- **Allowed:** discussing designs and trade-offs, suggesting approaches, explaining concepts or
-  errors, and reviewing hand-written code.
-- **Not allowed:** generating backend code, gateway configuration or infrastructure files, or
-  pasting AI-written snippets into them.
+- **Allowed:** discussing designs and trade-offs, suggesting approaches, explaining concepts and
+  showing errors, naming packages to add and functions or APIs to use, short code snippets
+  (about 15 lines or less, one idea each) that show how something works, and reviewing
+  hand-written code.
+- **Not allowed:** AI creating or editing files under `backends/`, gateway configuration or
+  infrastructure; whole files, handlers, modules or finished features; ready-to-apply diffs or
+  patches; pasting AI output in unchanged. Snippets are retyped and adapted by hand.
 
 ## Features in the app
 

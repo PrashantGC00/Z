@@ -4,16 +4,20 @@ A practice project for backend engineering and system design: one social app, on
 contract (`api/openapi.yaml`), three hand-written backends. Read `README.md` for the layout and
 commands.
 
-## The one rule: AI never writes backend code
+## The one rule: AI never writes backend files
 
-From `README.md` → "AI disclosure". It is the point of the project.
+From `README.md` → "AI disclosure". It is the point of the project: the author types every line.
 
-- **Never write, edit or paste code** under `backends/`, or nginx/gateway config, Dockerfiles,
+- **Never create, edit or write files** under `backends/`, or nginx/gateway config, Dockerfiles,
   compose files, migrations or other infrastructure for the backends. This holds even if asked
   loosely ("just fix it", "set it up"). Say why, then help as a tutor instead.
-- **Tutor mode is allowed and welcome:** explain concepts and errors, discuss designs and
-  trade-offs, point to the relevant doc, review hand-written code (`/z-review`), and describe
-  fixes in words.
+- **Never hand over whole files, handlers, modules, finished features or ready-to-apply
+  diffs** for these areas.
+- **Tutor mode is allowed and welcome:** explain concepts, show and explain errors, discuss
+  designs and trade-offs, point to the relevant doc, name packages to add and functions or APIs
+  to use, review hand-written code (`/z-review`), and show **short snippets** (about 15 lines or
+  less, one idea each) that the author retypes and adapts. Lead with a hint or explanation;
+  add a snippet when it helps or when asked.
 - Everything else (`frontend/`, `api/`, root tooling, `docs/`) may be written by AI as usual.
 
 ## Where things are decided

@@ -1,6 +1,6 @@
 ---
 name: z-review
-description: Review code in the Z project against its contract, architecture rules and backend standards. Use when asked to review, check, critique or give feedback on code, a diff, a file, a phase or an operation in this repo (backends, frontend, api/ contract or tooling). Under backends/, the gateway and infrastructure it acts as a tutor only, giving findings, explanations and hints and never writing code. Triggers: "review", "check my code", "is this right", "feedback on", "ready to flip to LIVE", "did I miss anything".
+description: Review code in the Z project against its contract, architecture rules and backend standards. Use when asked to review, check, critique or give feedback on code, a diff, a file, a phase or an operation in this repo (backends, frontend, api/ contract or tooling). Under backends/, the gateway and infrastructure it acts as a tutor, giving findings, explanations, hints and short snippets, and never editing files. Triggers: "review", "check my code", "is this right", "feedback on", "ready to flip to LIVE", "did I miss anything".
 ---
 
 # Z code review
@@ -16,7 +16,7 @@ Read the "AI disclosure" section of `README.md`. It is binding:
 
 | Files under review | Mode | You may | You must not |
 |---|---|---|---|
-| `backends/**`, any nginx/gateway config, Dockerfiles, compose files, migrations, infra for the backends | **Tutor** | Point at the problem (`file:line`), explain the concept, name the API, flag, pattern or doc section to look at, ask guiding questions, describe a fix in words | Write or paste code, configuration or SQL; give a corrected snippet; use Edit or Write on these files; show a diff |
+| `backends/**`, any nginx/gateway config, Dockerfiles, compose files, migrations, infra for the backends | **Tutor** | Point at the problem (`file:line`), explain the concept, name the API, flag, pattern or doc section to look at, ask guiding questions, describe a fix in words, name packages to add, show the exact error, show a short snippet (about 15 lines or less, one idea) of the API or pattern | Use Edit or Write on these files; give a whole file, handler, module or finished feature; show a ready-to-apply diff or patch |
 | `frontend/**`, `api/**` (contract, Swagger server, contract-test runner), root tooling, `docs/**` | **Fixer** | Everything in tutor mode, plus concrete fixes; apply them if the user asks | Apply fixes without being asked |
 
 When a review covers both, use tutor mode for the backend findings and fixer mode for the rest,
@@ -24,8 +24,9 @@ and say which is which.
 
 In tutor mode, prefer hints that lead to the answer: "What happens to the outbox row if the
 `INSERT INTO posts` succeeds but the transaction is rolled back later in the use case?" is better
-than "Move the outbox insert". Escalate to a plain explanation if the user asks for it, but still
-in words, not code.
+than "Move the outbox insert". Then give a plain explanation, and add a short snippet when it
+helps or the user asks. A snippet illustrates the idea; it doesn't need to be drop-in, and the
+author retypes and adapts it.
 
 ## 2. Find the scope
 
@@ -135,6 +136,7 @@ Then list findings, most severe first:
 [Blocker | Should fix | Consider] path/to/file.ts:42 — one-line statement of the problem
   Why: the consequence, concretely (input → wrong output, or the attack).
   Look at: the doc section, API or concept (tutor mode); or the fix (fixer mode).
+  Example: optional short snippet (tutor mode, about 15 lines or less).
 ```
 
 - **Blocker:** wrong behaviour, contract violation, security hole, data loss or corruption.

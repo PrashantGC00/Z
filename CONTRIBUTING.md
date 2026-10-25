@@ -12,7 +12,8 @@ the commit. The README covers what the project is and how to run it.
 3. Commit in small steps and check before each commit.
 4. Before merging, review the branch. In Claude Code, `/z-review` checks it against the
    contract, the [backend standards](docs/backend-standards.md) and the build plan. For
-   backend code it only points out problems and explains them; it never writes the fix.
+   backend code it explains problems and may show short snippets, but it never edits backend
+   files: you write the fix.
 5. Merge into `main` and delete the branch.
 
 ## Before every commit
