@@ -41,7 +41,7 @@ Rules for every phase:
    - Redpanda and Redpanda Console;
    - one Postgres container with init scripts creating a database and a role per service;
    - MongoDB as a **single-node replica set**, needed for transactions and change streams;
-   - Redis and MinIO;
+   - Redis and MinIO (image per [ADR-0008](../adr/0008-minio-image.md));
    - an OTel Collector, Jaeger, Prometheus and Grafana.
 3. `redpanda-init`: create every topic in [events.md](events.md#topics) with its partitions and
    retention.

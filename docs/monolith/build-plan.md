@@ -46,8 +46,9 @@ A thin slice through every layer, so later phases only add features.
 1. Scaffold `backends/monolith` as in [structure.md](structure.md). Turn on strict TypeScript,
    add ESLint and Prettier, and add `tsx watch` for dev. Add the package to
    `pnpm-workspace.yaml`.
-2. Write `docker-compose.yml` with Postgres 17, Redis 7 and MinIO (with a bucket created on
-   start), plus Jaeger. Leave Prometheus and Grafana for phase 12.
+2. Write `compose.monolith.yaml` with Postgres 17, Redis 7 and MinIO (with a bucket created on
+   start), plus Jaeger. Use the pinned `bitnamilegacy/minio` image; the official MinIO images
+   can no longer be pulled ([ADR-0008](../adr/0008-minio-image.md)). Leave Prometheus and Grafana for phase 12.
 3. Write `platform/config.ts`: a Zod schema of the environment variables, so the app fails fast.
 4. Write `platform/logger.ts` (pino with redaction) and `request-context.ts` (AsyncLocalStorage
    carrying the trace id).
@@ -64,9 +65,9 @@ A thin slice through every layer, so later phases only add features.
 11. Write `platform/shutdown.ts`: graceful `SIGTERM` handling.
 12. Write `nginx/nginx.conf`: listen on `:8081` and proxy `/v1/` to `:3000`, with a body size
     cap, timeouts and the WebSocket upgrade headers (ready for phase 8).
-13. Add the `package.json` scripts `up`, `dev`, `migrate`, `seed`, `test`, `lint`. The
-    monolith is TypeScript only, so it needs no Makefile. Run `up` as `pnpm run up`: bare
-    `pnpm up` is pnpm's own alias for `pnpm update`.
+13. Add the `package.json` scripts `compose`, `dev`, `migrate`, `seed`, `test`, `lint`. The
+    monolith is TypeScript only, so it needs no Makefile. Name the compose script `compose`,
+    not `up`: bare `pnpm up` is pnpm's own alias for `pnpm update`.
 14. Set up the test harness: Vitest, Supertest and Testcontainers Postgres. Write one HTTP test
     for health.
 15. Add a CI job for `backends/monolith` with path filters: lint, typecheck, tests, image
@@ -76,7 +77,7 @@ A thin slice through every layer, so later phases only add features.
 validation, the Postgres migration workflow.
 
 **Done when:**
-- `pnpm run up && pnpm dev`, then the app sidebar shows the monolith as **Responding**.
+- `pnpm compose && pnpm dev`, then the app sidebar shows the monolith as **Responding**.
 - `pnpm test:contract monolith getHealth` passes.
 - A request shows up in Jaeger.
 

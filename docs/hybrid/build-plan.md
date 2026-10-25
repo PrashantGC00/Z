@@ -27,7 +27,8 @@ behaviour changes underneath.
 **Steps:**
 1. Write `backends/hybrid/docker-compose.yml`. Build the core from `../monolith` and run
    `api`, `worker` and `relay` with `MEDIA_ADAPTER=local` for now. Give it its own Postgres,
-   Redis and MinIO on the [offset ports](README.md#ports), plus Jaeger.
+   Redis and MinIO ([ADR-0008](../adr/0008-minio-image.md) image) on the
+   [offset ports](README.md#ports), plus Jaeger.
 2. Write `nginx/nginx.conf` on `:8083` with `/v1/` → core and the WebSocket upgrade.
 3. `getHealth` must report `architecture: "hybrid"`. Make the architecture name config
    (`ARCHITECTURE=hybrid`), not a code fork.

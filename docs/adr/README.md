@@ -14,3 +14,4 @@ mark the old one *Superseded by ADR-NNNN*.
 | [0005](0005-ids-and-pagination.md) | ULIDs and opaque cursor pagination | Accepted |
 | [0006](0006-frontend-stack.md) | Frontend stack | Accepted |
 | [0007](0007-revise-backend-stacks.md) | Express TS monolith, four-language microservices, monolith + media service | Accepted |
+| [0008](0008-minio-image.md) | Run MinIO from the frozen Bitnami legacy image | Accepted |

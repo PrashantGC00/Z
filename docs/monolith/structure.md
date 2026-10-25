@@ -26,12 +26,12 @@ backends/monolith/
   observability/
     prometheus.yml
     grafana/                Provisioned datasources and dashboards (JSON)
-  docker-compose.yml        Postgres, Redis, MinIO, Jaeger, Prometheus, Grafana, nginx
+  compose.monolith.yaml     Postgres, Redis, MinIO, Jaeger, Prometheus, Grafana
   Dockerfile                Multi-stage, non-root; one image, three entrypoints
   .dependency-cruiser.cjs   Boundary rules (below)
   drizzle.config.ts
   .env.example
-  package.json              Scripts: up, dev, worker, migrate, seed, test, lint, load
+  package.json              Scripts: compose, dev, worker, migrate, seed, test, lint, load
   tsconfig.json
   README.md
 ```
