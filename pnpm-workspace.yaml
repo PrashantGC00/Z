@@ -1,0 +1,17 @@
+packages:
+  - frontend
+  # TypeScript backends join the workspace when they exist, e.g.:
+  # - backends/monolith
+  # - backends/microservices/services/gateway
+
+# Install scripts are opt-in. None of these are needed: swagger-ui telemetry, optional native
+# YAML/JSON parsers, MSW's worker copy (the worker is committed in frontend/public) and
+# esbuild's binary check (its platform binary comes as an optional dependency).
+allowBuilds:
+  '@scarf/scarf': false
+  '@tree-sitter-grammars/tree-sitter-yaml': false
+  core-js-pure: false
+  esbuild: false
+  msw: false
+  tree-sitter: false
+  tree-sitter-json: false

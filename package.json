@@ -1,0 +1,38 @@
+{
+  "name": "z-arch",
+  "private": true,
+  "description": "One social app, one API contract, three backend architectures.",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "dev": "pnpm run \"/^(dev:web|doc:api)$/\"",
+    "dev:web": "pnpm --filter z-frontend dev",
+    "doc:api": "node --watch api/swagger.ts",
+    "build:web": "pnpm --filter z-frontend build",
+    "lint": "pnpm --filter z-frontend lint && pnpm lint:api",
+    "test": "pnpm --filter z-frontend test",
+    "test:contract": "node api/contract-test.ts",
+    "typecheck": "pnpm --filter z-frontend typecheck && tsc -p tsconfig.json",
+    "format": "pnpm --filter z-frontend format",
+    "format:check": "pnpm --filter z-frontend format:check",
+    "lint:api": "redocly lint api/openapi.yaml"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.71.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/swagger-ui-express": "^4.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "typescript": "~6.0.3"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1"
+  },
+  "type": "module"
+}

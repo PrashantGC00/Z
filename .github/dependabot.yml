@@ -1,0 +1,35 @@
+# Weekly dependency update PRs, grouped so they arrive as a few PRs rather than dozens.
+# Add an entry per backend as it appears (ecosystems: npm, gomod, cargo, pip/uv, docker), e.g.
+#   - package-ecosystem: gomod
+#     directory: /backends/microservices/services/graph-svc
+version: 2
+updates:
+  # The pnpm workspace (root, frontend and future TypeScript backends) shares one lockfile.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    # An update joins the first group that matches, so the catch-all comes last.
+    groups:
+      react:
+        patterns: [react, react-dom, "@types/react", "@types/react-dom", react-router]
+      tooling:
+        patterns: [eslint*, "@eslint/*", typescript-eslint, prettier*, vitest, vite, "@vitejs/*"]
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]

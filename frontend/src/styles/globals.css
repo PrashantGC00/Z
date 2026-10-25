@@ -1,0 +1,142 @@
+@import 'tailwindcss';
+
+/*
+ * Cyanotype palette: Prussian-blue ink on cool paper, with one warm "safelight" accent
+ * reserved for things that need attention (unread badges, the composer's char limit).
+ * Each backend has its own hue so you always know which one is answering.
+ */
+:root {
+  --paper: #f4f6fa;
+  --surface: #ffffff;
+  --wash: #e7eef8;
+  --line: #d9e1ec;
+  --fg: #142238;
+  --muted: #5a6a82;
+  --ink: #1d4a8f;
+  --ink-strong: #14305c;
+  --on-ink: #ffffff;
+  --safelight: #c9781a;
+  --danger: #b93a26;
+  --live: #1d7f54;
+  --offline: #7b8798;
+
+  --backend-mock: #64748b;
+  --backend-monolith: #2f5ba8;
+  --backend-microservices: #0e7f81;
+  --backend-hybrid: #b5561f;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #0a1424;
+    --surface: #0f1d33;
+    --wash: #15284a;
+    --line: #213656;
+    --fg: #e2ebf7;
+    --muted: #93a4bf;
+    --ink: #8db4f0;
+    --ink-strong: #b8d1f7;
+    --on-ink: #0a1424;
+    --safelight: #f0b048;
+    --danger: #f08571;
+    --live: #4fc794;
+    --offline: #8592a6;
+
+    --backend-mock: #94a3b8;
+    --backend-monolith: #7aa2ec;
+    --backend-microservices: #45c4c6;
+    --backend-hybrid: #ef9a63;
+
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-wash: var(--wash);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-on-ink: var(--on-ink);
+  --color-safelight: var(--safelight);
+  --color-danger: var(--danger);
+  --color-live: var(--live);
+  --color-offline: var(--offline);
+  --color-backend-mock: var(--backend-mock);
+  --color-backend-monolith: var(--backend-monolith);
+  --color-backend-microservices: var(--backend-microservices);
+  --color-backend-hybrid: var(--backend-hybrid);
+}
+
+@theme {
+  --font-sans: 'Schibsted Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --animate-story: story-progress linear forwards;
+
+  @keyframes story-progress {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/* The active backend's hue, available to any element as `var(--backend)` / `bg-(--backend)`. */
+[data-backend='mock'] {
+  --backend: var(--backend-mock);
+}
+[data-backend='monolith'] {
+  --backend: var(--backend-monolith);
+}
+[data-backend='microservices'] {
+  --backend: var(--backend-microservices);
+}
+[data-backend='hybrid'] {
+  --backend: var(--backend-hybrid);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper font-sans text-fg antialiased;
+    font-feature-settings: 'ss01';
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ink;
+  }
+  ::selection {
+    @apply bg-ink text-on-ink;
+  }
+  dialog::backdrop {
+    background: rgb(10 20 36 / 0.55);
+    backdrop-filter: blur(2px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Popover menus anchor to their trigger where CSS anchor positioning exists, and center otherwise. */
+  .menu-popover {
+    position-area: bottom span-left;
+    position-try-fallbacks: flip-block;
+    margin: 4px 0;
+  }
+}

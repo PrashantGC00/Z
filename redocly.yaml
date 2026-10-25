@@ -1,0 +1,9 @@
+extends:
+  - recommended
+
+rules:
+  # Servers are local dev URLs by design.
+  no-server-example.com: off
+  info-license-strict: off
+  # 401/403 are documented once as global behaviour of bearer auth rather than on every operation.
+  operation-4xx-response: off

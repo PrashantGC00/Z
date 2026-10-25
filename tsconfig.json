@@ -1,0 +1,20 @@
+{
+  // Typechecks the Node scripts in api/ (Swagger server, contract tests). Node runs them directly;
+  // nothing is emitted.
+  // The frontend has its own config.
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "include": ["api/swagger.ts", "api/contract-test.ts"]
+}

@@ -1,0 +1,1688 @@
+openapi: 3.1.0
+info:
+  title: Z API
+  version: 1.0.0
+  summary: One contract, three backends.
+  description: |
+    Z is a social platform (feed, posts, comments, media, stories, follows,
+    chat and notifications) built three times over to practise system design.
+
+    **Every backend implements this exact contract**, so the React frontend can switch
+    between them at runtime without code changes.
+
+    | Architecture    | Base URL (local)                   | Style                                      |
+    |-----------------|------------------------------------|--------------------------------------------|
+    | `monolith`      | `http://localhost:8081/v1`         | Modular monolith                           |
+    | `microservices` | `http://localhost:8082/v1`         | Microservices                              |
+    | `hybrid`        | `http://localhost:8083/v1`         | Monolith + a media service for uploads and compression |
+
+    ### Implementation status
+    Each operation carries an `x-status` map with one entry per architecture:
+
+    ```yaml
+    x-status:
+      monolith: LIVE        # implemented and passing contract tests
+      microservices: OFFLINE
+      hybrid: OFFLINE
+    ```
+
+    The badges next to each operation are rendered from that map. The frontend reads the
+    same map to hide or disable features the selected backend has not built yet.
+    Flip a value to `LIVE` once that backend passes the contract tests for the operation.
+
+    ### Conventions
+    * **Auth** — `Authorization: Bearer <accessToken>` (JWT, 15 min). Rotate with `POST /auth/refresh`.
+      Any authenticated operation may return `401` (missing or expired token) or `429` (rate limited,
+      with `Retry-After`); those are not repeated on every operation.
+    * **Pagination** — cursor based: `?cursor=<opaque>&limit=<1-50>` → `{ data, page: { nextCursor, hasMore } }`.
+    * **Errors** — [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) `application/problem+json`.
+    * **Idempotency** — creates accept an `Idempotency-Key` header; replays return the original response.
+    * **Concurrency** — editable resources return an `ETag`; send `If-Match` on `PATCH`.
+    * **IDs** — ULIDs (sortable by creation time), timestamps are RFC 3339 UTC.
+    * **Realtime** — chat, typing, presence and notifications stream over WebSocket.
+      Get a ticket from `POST /realtime/tickets`; the protocol and events are described under **Realtime**.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:8081/v1
+    description: Modular monolith (local)
+  - url: http://localhost:8082/v1
+    description: Microservices (local)
+  - url: http://localhost:8083/v1
+    description: Monolith + media service (local)
+  - url: http://localhost:5173/mock/v1
+    description: In-browser mock (MSW) used by the frontend
+
+x-architectures:
+  monolith:
+    label: Modular monolith
+  microservices:
+    label: Microservices
+  hybrid:
+    label: Monolith + media service
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: System
+    description: Health and identity of the running backend. The frontend polls `/health` to show which backend is live.
+  - name: Auth
+    description: Registration, login and token rotation.
+  - name: Users
+    description: Profiles and account settings.
+  - name: Social graph
+    description: Follow, block and suggestions.
+  - name: Posts
+    description: Posts, likes, shares and bookmarks.
+  - name: Feed
+    description: Home timeline built by fan-out-on-write with fan-out-on-read for celebrity accounts.
+  - name: Comments
+    description: Threaded comments (one reply level) on posts.
+  - name: Media
+    description: Direct-to-object-storage uploads with asynchronous processing (thumbnails, transcodes).
+  - name: Stories
+    description: Ephemeral posts that expire after 24 hours.
+  - name: Chat
+    description: Direct and group conversations. Messages are delivered over WebSocket; these endpoints cover history and sending.
+  - name: Notifications
+    description: In-app notification inbox and delivery preferences.
+  - name: Search
+    description: Full-text search, hashtags and trending topics.
+  - name: Moderation
+    description: Reports against users, posts, comments and messages.
+  - name: Realtime
+    description: |
+      Chat, typing, presence and notifications are pushed over a WebSocket. Swagger cannot
+      describe WebSocket messages, so the protocol is specified here.
+
+      **Connecting.** `POST /realtime/tickets` returns `{ ticket, url }`. Connect to
+      `url?ticket=<ticket>` within 30 s; tickets are single use. Browsers cannot send an
+      `Authorization` header on the handshake, which is why tickets exist.
+
+      **Frames.** Every frame is JSON. Server frames are envelopes:
+      `{ "type": "message.created", "id": "<ulid>", "ts": "<RFC 3339>", "data": { … } }`.
+
+      **Heartbeat.** The server sends `{"type":"ping"}` every 25 s; the client answers
+      `{"type":"pong"}`. A client that hears nothing for 60 s reconnects.
+
+      **Resume.** After reconnecting, the client sends
+      `{"type":"resume","data":{"lastEventId":"<id>"}}` and the server replays missed events
+      (up to 5 minutes; older gaps are refetched over REST).
+
+      | Event | Direction | `data` | Meaning |
+      |---|---|---|---|
+      | `message.created` | server → client | `Message` | A message was stored in one of your conversations |
+      | `conversation.read` | server → client | `{ conversationId, userId, lastReadMessageId }` | A member moved their read marker |
+      | `typing` | server → client | `{ conversationId, userId }` | Someone is typing (expires after 5 s) |
+      | `presence.changed` | server → client | `{ userId, online, lastSeenAt }` | A user came online or went offline |
+      | `notification.created` | server → client | `Notification` | A new or re-aggregated notification |
+      | `unread.changed` | server → client | `UnreadCounts` | Badge counts changed |
+      | `post.stats` | server → client | `{ postId, likes, comments, shares }` | Live counters for subscribed posts (max 1/s per post) |
+      | `subscribe` | client → server | `{ postIds: string[] }` (max 50) | Follow live counters for posts on screen |
+      | `typing` | client → server | `{ conversationId }` | You are typing |
+      | `resume` | client → server | `{ lastEventId }` | Replay what you missed |
+      | `pong` | client → server | — | Heartbeat reply |
+
+paths:
+  # ───────────────────────────── System ─────────────────────────────
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Health and backend identity
+      security: []
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Backend is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  # ───────────────────────────── Auth ─────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Create an account
+      security: []
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Account created and signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with email and password
+      security: []
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshTokens
+      summary: Rotate the refresh token
+      description: Refresh tokens are single use. Presenting a used token revokes the whole token family (reuse detection).
+      security: []
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200":
+          description: New token pair.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthTokens" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke the current refresh token
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "204": { description: Signed out. }
+
+  # ───────────────────────────── Users ─────────────────────────────
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getMe
+      summary: Get the signed-in user
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: The signed-in user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      operationId: updateMe
+      summary: Update profile
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProfileRequest" }
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /users/{username}:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    get:
+      tags: [Users]
+      operationId: getUserProfile
+      summary: Get a profile by username
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /users/{username}/posts:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    get:
+      tags: [Posts]
+      operationId: listUserPosts
+      summary: List a user's posts
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of posts, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+
+  # ───────────────────────────── Social graph ─────────────────────────────
+  /users/{username}/follow:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    put:
+      tags: [Social graph]
+      operationId: followUser
+      summary: Follow a user
+      description: Idempotent. Emits `user.followed`, which drives notifications and feed backfill.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Relationship after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Relationship" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Social graph]
+      operationId: unfollowUser
+      summary: Unfollow a user
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Relationship after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Relationship" }
+  /users/{username}/followers:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    get:
+      tags: [Social graph]
+      operationId: listFollowers
+      summary: List followers
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of users.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserPage" }
+  /users/{username}/following:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    get:
+      tags: [Social graph]
+      operationId: listFollowing
+      summary: List accounts a user follows
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of users.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserPage" }
+  /users/{username}/block:
+    parameters: [{ $ref: "#/components/parameters/Username" }]
+    put:
+      tags: [Social graph]
+      operationId: blockUser
+      summary: Block a user
+      description: Removes follows in both directions and hides content from each other.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Relationship after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Relationship" }
+    delete:
+      tags: [Social graph]
+      operationId: unblockUser
+      summary: Unblock a user
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Relationship after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Relationship" }
+  /suggestions/users:
+    get:
+      tags: [Social graph]
+      operationId: listSuggestedUsers
+      summary: People you may know
+      description: Friends-of-friends ranked by mutual count, falling back to popular accounts.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Suggested users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SuggestedUser" }
+
+  # ───────────────────────────── Feed ─────────────────────────────
+  /feed:
+    get:
+      tags: [Feed]
+      operationId: getHomeFeed
+      summary: Home timeline
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of posts from followed accounts and the user, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+
+  # ───────────────────────────── Posts ─────────────────────────────
+  /posts:
+    post:
+      tags: [Posts]
+      operationId: createPost
+      summary: Publish a post
+      description: Media must be uploaded first (`POST /media/uploads`) and reach `ready` or `processing`.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePostRequest" }
+      responses:
+        "201":
+          description: Published.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /posts/{postId}:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    get:
+      tags: [Posts]
+      operationId: getPost
+      summary: Get a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: The post.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Posts]
+      operationId: updatePost
+      summary: Edit a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IfMatch" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePostRequest" }
+      responses:
+        "200":
+          description: Updated post.
+          headers:
+            ETag: { $ref: "#/components/headers/ETag" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "412": { $ref: "#/components/responses/PreconditionFailed" }
+    delete:
+      tags: [Posts]
+      operationId: deletePost
+      summary: Delete a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /posts/{postId}/like:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    put:
+      tags: [Posts]
+      operationId: likePost
+      summary: Like a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Reaction state after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LikeState" }
+    delete:
+      tags: [Posts]
+      operationId: unlikePost
+      summary: Remove a like
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Reaction state after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LikeState" }
+  /posts/{postId}/likes:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    get:
+      tags: [Posts]
+      operationId: listPostLikes
+      summary: Who liked a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of users.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserPage" }
+  /posts/{postId}/shares:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    post:
+      tags: [Posts]
+      operationId: sharePost
+      summary: Share a post to your followers
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string, maxLength: 500 }
+      responses:
+        "201":
+          description: The new share post, with `sharedPost` populated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Post" }
+  /posts/{postId}/bookmark:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    put:
+      tags: [Posts]
+      operationId: bookmarkPost
+      summary: Save a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Saved. }
+    delete:
+      tags: [Posts]
+      operationId: unbookmarkPost
+      summary: Remove from saved
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Removed. }
+  /bookmarks:
+    get:
+      tags: [Posts]
+      operationId: listBookmarks
+      summary: Saved posts
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of posts, most recently saved first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+
+  # ───────────────────────────── Comments ─────────────────────────────
+  /posts/{postId}/comments:
+    parameters: [{ $ref: "#/components/parameters/PostId" }]
+    get:
+      tags: [Comments]
+      operationId: listComments
+      summary: List comments on a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - name: parentId
+          in: query
+          description: Return replies to this comment instead of top-level comments.
+          schema: { $ref: "#/components/schemas/Id" }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of comments, oldest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentPage" }
+    post:
+      tags: [Comments]
+      operationId: createComment
+      summary: Comment on a post
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCommentRequest" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /comments/{commentId}:
+    parameters: [{ $ref: "#/components/parameters/CommentId" }]
+    patch:
+      tags: [Comments]
+      operationId: updateComment
+      summary: Edit a comment
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Comment" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [Comments]
+      operationId: deleteComment
+      summary: Delete a comment
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /comments/{commentId}/like:
+    parameters: [{ $ref: "#/components/parameters/CommentId" }]
+    put:
+      tags: [Comments]
+      operationId: likeComment
+      summary: Like a comment
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Reaction state after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LikeState" }
+    delete:
+      tags: [Comments]
+      operationId: unlikeComment
+      summary: Remove a like from a comment
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Reaction state after the change.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LikeState" }
+
+  # ───────────────────────────── Media ─────────────────────────────
+  /media/uploads:
+    post:
+      tags: [Media]
+      operationId: createMediaUpload
+      summary: Start an upload
+      description: |
+        Returns an upload URL. The client `PUT`s the file bytes to it, then calls
+        `POST /media/{mediaId}/complete`. The core API never receives media bytes.
+
+        Where `uploadUrl` points (a pre-signed object-storage URL, a dedicated upload service, …)
+        is a backend decision; the client only follows the URL and headers it is given.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUploadRequest" }
+      responses:
+        "201":
+          description: Upload slot.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaUpload" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /media/{mediaId}/complete:
+    parameters: [{ $ref: "#/components/parameters/MediaId" }]
+    post:
+      tags: [Media]
+      operationId: completeMediaUpload
+      summary: Finish an upload
+      description: Verifies the object exists and queues processing. Emits `media.uploaded`.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "202":
+          description: Accepted for processing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Media" }
+  /media/{mediaId}:
+    parameters: [{ $ref: "#/components/parameters/MediaId" }]
+    get:
+      tags: [Media]
+      operationId: getMedia
+      summary: Get media and processing status
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Media.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Media" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Media]
+      operationId: deleteMedia
+      summary: Delete unattached media
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Deleted. }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ───────────────────────────── Stories ─────────────────────────────
+  /stories:
+    get:
+      tags: [Stories]
+      operationId: listStoryReel
+      summary: Stories from people you follow
+      description: Grouped by author; groups with unseen stories come first.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Story groups.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/StoryGroup" }
+    post:
+      tags: [Stories]
+      operationId: createStory
+      summary: Post a story
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mediaId]
+              properties:
+                mediaId: { $ref: "#/components/schemas/Id" }
+                caption: { type: string, maxLength: 200 }
+      responses:
+        "201":
+          description: Created; expires 24 h after `createdAt`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Story" }
+  /stories/{storyId}:
+    parameters: [{ $ref: "#/components/parameters/StoryId" }]
+    delete:
+      tags: [Stories]
+      operationId: deleteStory
+      summary: Delete a story
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Deleted. }
+  /stories/{storyId}/views:
+    parameters: [{ $ref: "#/components/parameters/StoryId" }]
+    post:
+      tags: [Stories]
+      operationId: markStoryViewed
+      summary: Mark a story as seen
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Recorded. }
+
+  # ───────────────────────────── Chat ─────────────────────────────
+  /conversations:
+    get:
+      tags: [Chat]
+      operationId: listConversations
+      summary: Your conversations
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of conversations, most recent activity first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConversationPage" }
+    post:
+      tags: [Chat]
+      operationId: createConversation
+      summary: Start a conversation
+      description: For `direct`, returns the existing conversation with that user if one exists (200) instead of creating another.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateConversationRequest" }
+      responses:
+        "200":
+          description: Existing direct conversation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Conversation" }
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Conversation" }
+  /conversations/{conversationId}:
+    parameters: [{ $ref: "#/components/parameters/ConversationId" }]
+    get:
+      tags: [Chat]
+      operationId: getConversation
+      summary: Get a conversation
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Conversation.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Conversation" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /conversations/{conversationId}/messages:
+    parameters: [{ $ref: "#/components/parameters/ConversationId" }]
+    get:
+      tags: [Chat]
+      operationId: listMessages
+      summary: Message history
+      description: Newest first. Page backwards with `cursor`.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of messages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessagePage" }
+    post:
+      tags: [Chat]
+      operationId: sendMessage
+      summary: Send a message
+      description: |
+        `clientMessageId` makes the send idempotent and lets the client reconcile its optimistic
+        copy with the `message.created` event delivered over WebSocket.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SendMessageRequest" }
+      responses:
+        "201":
+          description: Stored and fanned out.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+  /conversations/{conversationId}/read:
+    parameters: [{ $ref: "#/components/parameters/ConversationId" }]
+    post:
+      tags: [Chat]
+      operationId: markConversationRead
+      summary: Move your read marker
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lastReadMessageId]
+              properties:
+                lastReadMessageId: { $ref: "#/components/schemas/Id" }
+      responses:
+        "204": { description: Updated. }
+
+  # ───────────────────────────── Notifications ─────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: Notification inbox
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema: { type: boolean, default: false }
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of notifications, newest first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPage" }
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      operationId: getUnreadCounts
+      summary: Unread badges
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Counts for the nav badges.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnreadCounts" }
+  /notifications/{notificationId}/read:
+    parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema: { $ref: "#/components/schemas/Id" }
+    post:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification read
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Updated. }
+  /notifications/read-all:
+    post:
+      tags: [Notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark everything read
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "204": { description: Updated. }
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      operationId: getNotificationPreferences
+      summary: Delivery preferences
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "200":
+          description: Preferences.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPreferences" }
+    put:
+      tags: [Notifications]
+      operationId: updateNotificationPreferences
+      summary: Change delivery preferences
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NotificationPreferences" }
+      responses:
+        "200":
+          description: Saved preferences.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPreferences" }
+
+  # ───────────────────────────── Search ─────────────────────────────
+  /search:
+    get:
+      tags: [Search]
+      operationId: search
+      summary: Search people, posts and hashtags
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: type
+          in: query
+          schema: { type: string, enum: [all, users, posts, hashtags], default: all }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Results grouped by type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResults" }
+  /hashtags/trending:
+    get:
+      tags: [Search]
+      operationId: listTrendingHashtags
+      summary: Trending hashtags
+      description: Ranked by post velocity over a sliding 6 hour window.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Hashtags.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Hashtag" }
+  /hashtags/{tag}/posts:
+    parameters:
+      - name: tag
+        in: path
+        required: true
+        schema: { type: string, pattern: "^[A-Za-z0-9_]{1,50}$" }
+    get:
+      tags: [Search]
+      operationId: listHashtagPosts
+      summary: Posts with a hashtag
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      parameters:
+        - { $ref: "#/components/parameters/Cursor" }
+        - { $ref: "#/components/parameters/Limit" }
+      responses:
+        "200":
+          description: Page of posts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostPage" }
+
+  # ───────────────────────────── Moderation ─────────────────────────────
+  /reports:
+    post:
+      tags: [Moderation]
+      operationId: createReport
+      summary: Report content or a user
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateReportRequest" }
+      responses:
+        "202": { description: Queued for review. }
+
+  # ───────────────────────────── Realtime ─────────────────────────────
+  /realtime/tickets:
+    post:
+      tags: [Realtime]
+      operationId: createRealtimeTicket
+      summary: Get a WebSocket ticket
+      description: |
+        Browsers cannot set headers on a WebSocket handshake, so the client exchanges its JWT for a
+        single-use ticket valid for 30 seconds and connects to `url?ticket=<ticket>`.
+        Each architecture returns its own `url` — the frontend never hard-codes the socket host.
+      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      responses:
+        "201":
+          description: Ticket.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RealtimeTicket" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    ETag:
+      description: Version of the resource; send back in `If-Match`.
+      schema: { type: string }
+
+  parameters:
+    Username:
+      name: username
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Username" }
+    PostId:
+      name: postId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    MediaId:
+      name: mediaId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    StoryId:
+      name: storyId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    ConversationId:
+      name: conversationId
+      in: path
+      required: true
+      schema: { $ref: "#/components/schemas/Id" }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `page.nextCursor`.
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Client-generated UUID. Replays within 24 h return the original response.
+      schema: { type: string, format: uuid }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: The `ETag` you last read.
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid credentials.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: Authenticated but not allowed.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Resource does not exist or is hidden from you.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: The request conflicts with current state.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PreconditionFailed:
+      description: "`If-Match` did not match; reload and retry."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PayloadTooLarge:
+      description: File exceeds the size limit for its type.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ValidationFailed:
+      description: Body failed validation.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Rate limited. See `Retry-After`.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Id:
+      type: string
+      description: ULID.
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+      examples: ["01JB3Z8Q5R6T7V8W9X0Y1Z2A3B"]
+    Username:
+      type: string
+      pattern: "^[a-z0-9_.]{3,30}$"
+      examples: ["ada.l"]
+    Timestamp:
+      type: string
+      format: date-time
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri, examples: ["https://z.example/problems/validation"] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        traceId: { type: string, description: Correlates with backend traces (W3C traceparent). }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+
+    PageInfo:
+      type: object
+      required: [hasMore]
+      properties:
+        nextCursor: { type: [string, "null"] }
+        hasMore: { type: boolean }
+
+    Health:
+      type: object
+      required: [status, architecture, version, time]
+      properties:
+        status: { type: string, enum: [ok, degraded] }
+        architecture: { type: string, enum: [monolith, microservices, hybrid, mock] }
+        version: { type: string }
+        time: { $ref: "#/components/schemas/Timestamp" }
+        dependencies:
+          type: object
+          description: "Per-dependency status, e.g. `{ \"postgres\": \"ok\", \"kafka\": \"degraded\" }`."
+          additionalProperties: { type: string, enum: [ok, degraded, down] }
+
+    # ── Auth ──
+    RegisterRequest:
+      type: object
+      required: [email, password, username, displayName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 10, maxLength: 128 }
+        username: { $ref: "#/components/schemas/Username" }
+        displayName: { type: string, minLength: 1, maxLength: 60 }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn: { type: integer, description: Seconds until the access token expires. }
+    AuthSession:
+      type: object
+      required: [user, tokens]
+      properties:
+        user: { $ref: "#/components/schemas/Me" }
+        tokens: { $ref: "#/components/schemas/AuthTokens" }
+
+    # ── Users ──
+    UserSummary:
+      type: object
+      required: [id, username, displayName, verified]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        username: { $ref: "#/components/schemas/Username" }
+        displayName: { type: string }
+        avatarUrl: { type: [string, "null"], format: uri }
+        verified: { type: boolean }
+    Relationship:
+      type: object
+      required: [following, followedBy, blocking]
+      properties:
+        following: { type: boolean, description: You follow them. }
+        followedBy: { type: boolean, description: They follow you. }
+        blocking: { type: boolean }
+    UserProfile:
+      allOf:
+        - $ref: "#/components/schemas/UserSummary"
+        - type: object
+          required: [stats, relationship, createdAt]
+          properties:
+            bio: { type: [string, "null"], maxLength: 300 }
+            location: { type: [string, "null"] }
+            website: { type: [string, "null"], format: uri }
+            coverUrl: { type: [string, "null"], format: uri }
+            createdAt: { $ref: "#/components/schemas/Timestamp" }
+            stats:
+              type: object
+              required: [posts, followers, following]
+              properties:
+                posts: { type: integer }
+                followers: { type: integer }
+                following: { type: integer }
+            relationship:
+              description: Null when viewing your own profile.
+              oneOf:
+                - $ref: "#/components/schemas/Relationship"
+                - type: "null"
+    Me:
+      allOf:
+        - $ref: "#/components/schemas/UserProfile"
+        - type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+    UpdateProfileRequest:
+      type: object
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 60 }
+        bio: { type: [string, "null"], maxLength: 300 }
+        location: { type: [string, "null"], maxLength: 60 }
+        website: { type: [string, "null"], format: uri }
+        avatarMediaId: { $ref: "#/components/schemas/Id" }
+        coverMediaId: { $ref: "#/components/schemas/Id" }
+    SuggestedUser:
+      allOf:
+        - $ref: "#/components/schemas/UserSummary"
+        - type: object
+          required: [mutualCount, reason]
+          properties:
+            mutualCount: { type: integer }
+            reason: { type: string, enum: [mutuals, popular, new] }
+    UserPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/UserSummary" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+
+    # ── Media ──
+    CreateUploadRequest:
+      type: object
+      required: [contentType, sizeBytes, purpose]
+      properties:
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png, image/webp, image/gif, video/mp4, video/webm]
+        sizeBytes: { type: integer, minimum: 1, maximum: 209715200 }
+        purpose: { type: string, enum: [post, story, avatar, cover, message] }
+        fileName: { type: string, maxLength: 255 }
+    MediaUpload:
+      type: object
+      required: [mediaId, uploadUrl, method, headers, expiresAt]
+      properties:
+        mediaId: { $ref: "#/components/schemas/Id" }
+        uploadUrl: { type: string, format: uri, description: Pre-signed object-storage URL. }
+        method: { type: string, enum: [PUT] }
+        headers:
+          type: object
+          description: Headers the client must send with the upload.
+          additionalProperties: { type: string }
+        expiresAt: { $ref: "#/components/schemas/Timestamp" }
+    MediaVariant:
+      type: object
+      required: [name, url]
+      properties:
+        name: { type: string, enum: [original, thumb, small, medium, large, hls] }
+        url: { type: string, format: uri }
+        width: { type: integer }
+        height: { type: integer }
+    Media:
+      type: object
+      required: [id, kind, status, contentType, variants]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        kind: { type: string, enum: [image, video] }
+        status: { type: string, enum: [pending, processing, ready, failed] }
+        contentType: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        durationMs: { type: integer }
+        blurhash: { type: string, description: Placeholder rendered while the image loads. }
+        altText: { type: string, maxLength: 1000 }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/MediaVariant" }
+
+    # ── Posts ──
+    Visibility:
+      type: string
+      enum: [public, followers, private]
+    CreatePostRequest:
+      type: object
+      properties:
+        text: { type: string, maxLength: 5000 }
+        mediaIds:
+          type: array
+          maxItems: 10
+          items: { $ref: "#/components/schemas/Id" }
+        visibility: { $ref: "#/components/schemas/Visibility" }
+      description: Must include `text`, `mediaIds`, or both.
+    UpdatePostRequest:
+      type: object
+      minProperties: 1
+      properties:
+        text: { type: string, maxLength: 5000 }
+        visibility: { $ref: "#/components/schemas/Visibility" }
+    Post:
+      type: object
+      required: [id, author, text, media, visibility, stats, viewer, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        author: { $ref: "#/components/schemas/UserSummary" }
+        text: { type: string }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/Media" }
+        hashtags:
+          type: array
+          items: { type: string }
+        mentions:
+          type: array
+          items: { $ref: "#/components/schemas/UserSummary" }
+        visibility: { $ref: "#/components/schemas/Visibility" }
+        sharedPost:
+          description: Present when this post is a share.
+          oneOf:
+            - $ref: "#/components/schemas/Post"
+            - type: "null"
+        stats:
+          type: object
+          required: [likes, comments, shares]
+          properties:
+            likes: { type: integer }
+            comments: { type: integer }
+            shares: { type: integer }
+        viewer:
+          type: object
+          description: State relative to the signed-in user.
+          required: [liked, bookmarked]
+          properties:
+            liked: { type: boolean }
+            bookmarked: { type: boolean }
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+        editedAt: { oneOf: [{ $ref: "#/components/schemas/Timestamp" }, { type: "null" }] }
+    PostPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+    LikeState:
+      type: object
+      required: [liked, likes]
+      properties:
+        liked: { type: boolean }
+        likes: { type: integer }
+
+    # ── Comments ──
+    CreateCommentRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 2000 }
+        parentId: { $ref: "#/components/schemas/Id" }
+    Comment:
+      type: object
+      required: [id, postId, author, text, likes, replyCount, viewer, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        postId: { $ref: "#/components/schemas/Id" }
+        parentId: { oneOf: [{ $ref: "#/components/schemas/Id" }, { type: "null" }] }
+        author: { $ref: "#/components/schemas/UserSummary" }
+        text: { type: string }
+        likes: { type: integer }
+        replyCount: { type: integer }
+        viewer:
+          type: object
+          required: [liked]
+          properties:
+            liked: { type: boolean }
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+        editedAt: { oneOf: [{ $ref: "#/components/schemas/Timestamp" }, { type: "null" }] }
+    CommentPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Comment" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+
+    # ── Stories ──
+    Story:
+      type: object
+      required: [id, author, media, createdAt, expiresAt, seen]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        author: { $ref: "#/components/schemas/UserSummary" }
+        media: { $ref: "#/components/schemas/Media" }
+        caption: { type: [string, "null"] }
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+        expiresAt: { $ref: "#/components/schemas/Timestamp" }
+        seen: { type: boolean }
+        viewCount: { type: integer, description: Only returned to the author. }
+    StoryGroup:
+      type: object
+      required: [author, stories, hasUnseen]
+      properties:
+        author: { $ref: "#/components/schemas/UserSummary" }
+        hasUnseen: { type: boolean }
+        stories:
+          type: array
+          items: { $ref: "#/components/schemas/Story" }
+
+    # ── Chat ──
+    CreateConversationRequest:
+      type: object
+      required: [type, memberIds]
+      properties:
+        type: { type: string, enum: [direct, group] }
+        memberIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: "#/components/schemas/Id" }
+        title: { type: string, maxLength: 80, description: Groups only. }
+    Conversation:
+      type: object
+      required: [id, type, members, unreadCount, updatedAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        type: { type: string, enum: [direct, group] }
+        title: { type: [string, "null"] }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/UserSummary" }
+        lastMessage: { oneOf: [{ $ref: "#/components/schemas/Message" }, { type: "null" }] }
+        unreadCount: { type: integer }
+        updatedAt: { $ref: "#/components/schemas/Timestamp" }
+    SendMessageRequest:
+      type: object
+      required: [clientMessageId]
+      properties:
+        clientMessageId: { type: string, format: uuid }
+        text: { type: string, maxLength: 4000 }
+        mediaIds:
+          type: array
+          maxItems: 4
+          items: { $ref: "#/components/schemas/Id" }
+        replyToId: { $ref: "#/components/schemas/Id" }
+    Message:
+      type: object
+      required: [id, conversationId, clientMessageId, sender, text, media, createdAt]
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        conversationId: { $ref: "#/components/schemas/Id" }
+        clientMessageId: { type: string, format: uuid }
+        sender: { $ref: "#/components/schemas/UserSummary" }
+        text: { type: string }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/Media" }
+        replyToId: { oneOf: [{ $ref: "#/components/schemas/Id" }, { type: "null" }] }
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+    ConversationPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Conversation" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+    MessagePage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+
+    # ── Notifications ──
+    NotificationType:
+      type: string
+      enum: [follow, post_like, post_comment, comment_reply, comment_like, post_share, mention, message]
+    Notification:
+      type: object
+      required: [id, type, actors, actorCount, read, createdAt]
+      description: |
+        Notifications are aggregated: "Ada and 4 others liked your post" is one notification with
+        `actorCount: 5` and the most recent actors in `actors`.
+      properties:
+        id: { $ref: "#/components/schemas/Id" }
+        type: { $ref: "#/components/schemas/NotificationType" }
+        actors:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/UserSummary" }
+        actorCount: { type: integer }
+        target:
+          type: object
+          description: What the notification points at.
+          properties:
+            kind: { type: string, enum: [post, comment, user, conversation] }
+            id: { $ref: "#/components/schemas/Id" }
+            preview: { type: string, description: Short excerpt of the target. }
+        read: { type: boolean }
+        createdAt: { $ref: "#/components/schemas/Timestamp" }
+    NotificationPage:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        page: { $ref: "#/components/schemas/PageInfo" }
+    UnreadCounts:
+      type: object
+      required: [notifications, messages]
+      properties:
+        notifications: { type: integer }
+        messages: { type: integer }
+    NotificationPreferences:
+      type: object
+      required: [channels]
+      properties:
+        channels:
+          type: object
+          description: For each notification type, which channels deliver it.
+          additionalProperties:
+            type: object
+            required: [inApp, email, push]
+            properties:
+              inApp: { type: boolean }
+              email: { type: boolean }
+              push: { type: boolean }
+
+    # ── Search ──
+    Hashtag:
+      type: object
+      required: [tag, postCount]
+      properties:
+        tag: { type: string }
+        postCount: { type: integer }
+        trendScore: { type: number }
+    SearchResults:
+      type: object
+      required: [users, posts, hashtags]
+      properties:
+        users:
+          type: array
+          items: { $ref: "#/components/schemas/UserSummary" }
+        posts:
+          type: array
+          items: { $ref: "#/components/schemas/Post" }
+        hashtags:
+          type: array
+          items: { $ref: "#/components/schemas/Hashtag" }
+
+    # ── Moderation ──
+    CreateReportRequest:
+      type: object
+      required: [targetKind, targetId, reason]
+      properties:
+        targetKind: { type: string, enum: [user, post, comment, message] }
+        targetId: { $ref: "#/components/schemas/Id" }
+        reason: { type: string, enum: [spam, harassment, hate, violence, nudity, misinformation, other] }
+        details: { type: string, maxLength: 1000 }
+
+    # ── Realtime ──
+    RealtimeTicket:
+      type: object
+      required: [ticket, url, expiresAt]
+      properties:
+        ticket: { type: string }
+        url: { type: string, format: uri, examples: ["ws://localhost:8081/v1/realtime"] }
+        expiresAt: { $ref: "#/components/schemas/Timestamp" }
