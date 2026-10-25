@@ -167,14 +167,16 @@ recover.
 Rules: no mocking the database in integration tests; each test sets up its own data; tests
 run in parallel and in any order; a failing test names the rule it protects.
 
-**Done:** `make test` (or the language equivalent) runs unit, integration and HTTP tests
-locally and in CI.
+**Done:** one `test` task (`pnpm test`, `make test` or the language equivalent) runs unit,
+integration and HTTP tests locally and in CI.
 
 ## 10. Local development and delivery
 
 - **One command up:** `docker compose up` starts every dependency; another starts the app with
-  hot reload. A `Makefile` (or `justfile`) per backend lists the common tasks (`up`, `dev`,
-  `migrate`, `seed`, `test`, `lint`, `load`).
+  hot reload. Each backend names its common tasks the same way (`up`, `dev`, `migrate`,
+  `seed`, `test`, `lint`, `load`). A single-language TypeScript backend keeps them as
+  `package.json` scripts. A backend with several languages adds a `Makefile` (or `justfile`)
+  at its root so every service answers to the same commands.
 - **Containers:** multi-stage Dockerfiles, a non-root user, a pinned base image, a
   healthcheck, and only the build output in the final image.
 - **CI per backend:** lint, typecheck or compile, unit and integration tests, image build, and

@@ -31,8 +31,7 @@ backends/monolith/
   .dependency-cruiser.cjs   Boundary rules (below)
   drizzle.config.ts
   .env.example
-  Makefile                  up, dev, worker, migrate, seed, test, lint, load
-  package.json
+  package.json              Scripts: up, dev, worker, migrate, seed, test, lint, load
   tsconfig.json
   README.md
 ```

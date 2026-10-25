@@ -64,7 +64,9 @@ A thin slice through every layer, so later phases only add features.
 11. Write `platform/shutdown.ts`: graceful `SIGTERM` handling.
 12. Write `nginx/nginx.conf`: listen on `:8081` and proxy `/v1/` to `:3000`, with a body size
     cap, timeouts and the WebSocket upgrade headers (ready for phase 8).
-13. Write the Makefile targets `up`, `dev`, `migrate`, `seed`, `test`, `lint`.
+13. Add the `package.json` scripts `up`, `dev`, `migrate`, `seed`, `test`, `lint`. The
+    monolith is TypeScript only, so it needs no Makefile. Run `up` as `pnpm run up`: bare
+    `pnpm up` is pnpm's own alias for `pnpm update`.
 14. Set up the test harness: Vitest, Supertest and Testcontainers Postgres. Write one HTTP test
     for health.
 15. Add a CI job for `backends/monolith` with path filters: lint, typecheck, tests, image
@@ -74,7 +76,7 @@ A thin slice through every layer, so later phases only add features.
 validation, the Postgres migration workflow.
 
 **Done when:**
-- `make up && make dev`, then the app sidebar shows the monolith as **Responding**.
+- `pnpm run up && pnpm dev`, then the app sidebar shows the monolith as **Responding**.
 - `pnpm test:contract monolith getHealth` passes.
 - A request shows up in Jaeger.
 
