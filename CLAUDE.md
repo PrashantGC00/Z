@@ -26,8 +26,7 @@ From `README.md` → "AI disclosure". It is the point of the project: the author
   `pnpm typecheck`, then update the mock in `frontend/src/mocks/handlers.ts`.
 - Build plans and standards for each backend: `docs/backend-standards.md`, `docs/monolith/`,
   `docs/hybrid/`, `docs/microservices/`. Decisions: `docs/adr/`.
-- Commit conventions and checks: `CONTRIBUTING.md`. Don't add Claude co-author or session
-  trailers to commits.
+- Commit conventions and checks: `CONTRIBUTING.md`.
 
 ## Checks
 
