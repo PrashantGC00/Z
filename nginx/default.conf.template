@@ -1,0 +1,66 @@
+limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      '';
+}
+
+map $uri $problem_instance {
+  "~^[A-Za-z0-9/._~:@!$&'()*+,;=-]*$"  $uri;
+  default                              "";
+}
+
+upstream monolith {
+  server ${MONOLITH_UPSTREAM};
+  keepalive 16;
+}
+
+map $uri $allowed_methods {
+  default        "GET, POST, PUT, PATCH, DELETE";
+  /v1/health     "GET";
+}
+
+server {
+  listen 8081;
+  server_name _;
+
+  client_max_body_size 10m;
+
+  error_page 405 @problem_405;
+  error_page 429 @problem_429;
+
+  location @problem_405 {
+    default_type application/problem+json;
+    add_header Allow $allowed_methods always;
+    add_header X-Request-Id $request_id always;
+    return 405 '{"type":"about:blank","title":"Method Not Allowed","status":405,"detail":"$request_method is not allowed on this resource","instance":"$problem_instance","traceId":"$request_id"}';
+  }
+
+  location @problem_429 {
+    default_type application/problem+json;
+    add_header Retry-After 1 always;
+    add_header X-Request-Id $request_id always;
+    return 429 '{"type":"about:blank","title":"Too Many Requests","status":429,"detail":"Rate limit exceeded","instance":"$problem_instance","traceId":"$request_id"}';
+  }
+
+
+  location /v1/ {
+    limit_req zone=api burst=20 nodelay;
+    limit_req_status 429;
+
+    proxy_pass http://monolith;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Request-Id      $request_id;
+    proxy_set_header Upgrade           $http_upgrade;
+    proxy_set_header Connection        $connection_upgrade;
+
+    proxy_connect_timeout 5s;
+    proxy_send_timeout    30s;
+    proxy_read_timeout    30s;
+  }
+}
