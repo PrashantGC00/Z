@@ -35,7 +35,6 @@ jobs:
 
       - uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1.0.262
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --append-system-prompt "Before answering, read CLAUDE.md and the AI disclosure in README.md. For a review request, follow .claude/skills/z-review/SKILL.md. Under backends/, nginx/ and backend infra you are a tutor: hints, explanations and short snippets (about 15 lines, one idea) only; never whole files, handlers or ready-to-apply diffs. You cannot edit files or push commits; reply in comments."
