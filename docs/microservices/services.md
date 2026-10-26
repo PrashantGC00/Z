@@ -22,8 +22,10 @@ gRPC API or by consuming its events.
 | moderation-svc | `createReport` | 1 |
 | **Total** | | **59** |
 
-\* `getHealth` starts on identity-svc, the first service built. A stretch goal is a small
-aggregator that reports `degraded` when any service's `/readyz` fails.
+\* `getHealth` lives on identity-svc, the first service built, and aggregates the `/readyz` of
+every configured service, reporting `degraded` when any fails
+([ADR-0010](../adr/0010-build-order-and-slim-microservices-phase-0.md)). It can move to a small
+service of its own later.
 
 ## Cross-cutting decisions
 

@@ -40,8 +40,10 @@ All three sit behind an nginx gateway for rate limiting and request protection, 
 locally; no cloud account is needed. The monolith's walking skeleton (phase 0, `getHealth`)
 is running; the other two are not started yet.
 
-Suggested order: monolith first (learn the domain, find the seams), then microservices (cut
-along those seams), then the media service (extract one module from the monolith).
+Build order ([ADR-0010](docs/adr/0010-build-order-and-slim-microservices-phase-0.md)): every
+backend answers `getHealth` first, then the monolith leads (learn the domain, find the seams),
+the microservices follow milestone by milestone (cut along those seams), and the media service
+is extracted from the monolith once it has a media module.
 
 Each one has a step-by-step build plan: [monolith](docs/monolith/), [microservices](docs/microservices/)
 and [hybrid](docs/hybrid/), all held to the same [backend standards](docs/backend-standards.md).

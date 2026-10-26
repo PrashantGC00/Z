@@ -35,6 +35,14 @@ Rules for every phase:
 
 **LIVE:** `getHealth` (served by the identity-svc skeleton)
 
+**Slim version first** ([ADR-0010](../adr/0010-build-order-and-slim-microservices-phase-0.md)):
+build only steps 1, 5 (one route, no checker script), 6 and a CI job for identity-svc, with
+identity-svc's Postgres and Jaeger as the only infrastructure. The rest of the platform below
+arrives in the phase that first needs it: Redis and Redpanda in phase 1, `proto/`, the route
+checker and the CI matrix in phase 2, MinIO in phase 4, MongoDB in phase 6, the OTel
+Collector, Prometheus and Grafana in phase 12. `getHealth` aggregates the `/readyz` of every
+configured service, as the ADR describes.
+
 **Steps:**
 1. Lay out the repo as in [structure.md](structure.md).
 2. Write `deploy/compose/docker-compose.yml`:
@@ -47,7 +55,7 @@ Rules for every phase:
    retention.
 4. `proto/`: set up buf lint, breaking-change detection and generation for the four languages.
    Write `common/v1/page.proto`.
-5. `nginx.conf` on `:8082` with the [routing table](structure.md#gateway-routing), at first
+5. A `:8082` server block in the root `nginx/default.conf.template` with the [routing table](structure.md#gateway-routing), at first
    routing only `/v1/health`. Add a script that checks every contract path maps to an upstream.
 6. Scaffold the identity-svc skeleton (Express TS): config, logging, OTel, problem+json,
    `/v1/health` reporting `architecture: "microservices"`, `/livez`, `/readyz`, graceful

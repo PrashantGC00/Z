@@ -25,8 +25,6 @@ backends/microservices/
       postgres-init/          Creates one database and one role per Postgres-owning service
       mongo-init/             Initiates the single-node replica set; one database per service
       redpanda-init/          Creates topics with partitions and retention
-    nginx/
-      nginx.conf              :8082 — path-based routing to services; WebSocket upgrade for /v1/realtime
     observability/
       otel-collector.yaml     One collector: OTLP in → Jaeger + Prometheus out
       prometheus.yml
@@ -150,7 +148,8 @@ services/post-svc/
 
 ## Gateway routing
 
-nginx routes by path prefix to the owning service ([service catalog](services.md)). Some routes
+The `:8082` gateway lives in the root `nginx/` with the others ([ADR-0009](../adr/0009-shared-gateway-two-modes.md)).
+It routes by path prefix to the owning service ([service catalog](services.md)). Some routes
 need care:
 
 | Path | Service | Note |

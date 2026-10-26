@@ -16,3 +16,4 @@ mark the old one *Superseded by ADR-NNNN*.
 | [0007](0007-revise-backend-stacks.md) | Express TS monolith, four-language microservices, monolith + media service | Accepted |
 | [0008](0008-minio-image.md) | Run MinIO from the frozen Bitnami legacy image | Accepted |
 | [0009](0009-shared-gateway-two-modes.md) | One gateway folder at the repo root, with a host and a container mode | Accepted |
+| [0010](0010-build-order-and-slim-microservices-phase-0.md) | Bring every backend to getHealth first, with a slim microservices phase 0 | Accepted |
