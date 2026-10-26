@@ -1,0 +1,20 @@
+name: z_nginx
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - ./default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      MONOLITH_UPSTREAM: ${MONOLITH_UPSTREAM:-z-monolith:3000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks: [edge]
+
+networks:
+  edge:
+    name: z_edge
+    external: true

@@ -132,7 +132,7 @@ paths:
       operationId: getHealth
       summary: Health and backend identity
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       responses:
         "200":
           description: Backend is up.

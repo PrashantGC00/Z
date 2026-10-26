@@ -1,7 +1,7 @@
 packages:
   - frontend
   # TypeScript backends join the workspace when they exist, e.g.:
-  # - backends/monolith
+  - backends/monolith
   # - backends/microservices/services/gateway
 
 # Install scripts are opt-in. None of these are needed: swagger-ui telemetry, optional native
@@ -11,7 +11,10 @@ allowBuilds:
   '@scarf/scarf': false
   '@tree-sitter-grammars/tree-sitter-yaml': false
   core-js-pure: false
+  cpu-features: false
   esbuild: false
   msw: false
+  protobufjs: true
+  ssh2: false
   tree-sitter: false
   tree-sitter-json: false
