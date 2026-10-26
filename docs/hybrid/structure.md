@@ -51,16 +51,18 @@ backends/hybrid/
     .env.example
     package.json
     tsconfig.json
-  nginx/
-    nginx.conf              :8083 — /v1 → core, /upload → receiver, /files → MinIO public prefix
   load/
     uploads.js              k6: concurrent image uploads end to end
   observability/            Prometheus scrape config, Grafana dashboard for queues and workers
   docker-compose.yml        Core (api, worker, relay) from ../monolith, media receiver and worker,
-                            Postgres, Redis, MinIO, Jaeger, nginx
+                            Postgres, Redis, MinIO, Jaeger
   Makefile                  up, dev, test, load, chaos-* targets
   README.md
 ```
+
+The gateway is not in this folder. Per [ADR-0009](../adr/0009-shared-gateway-two-modes.md),
+the `:8083` server (`/v1` → core, `/upload` → receiver, `/files` → MinIO public prefix) is
+another `server` block and upstream variables in the root `nginx/`.
 
 The media service has the same layering idea as a monolith module, but it is small. It has
 no database and no domain model beyond "a job". Don't add layers it doesn't need.
@@ -74,7 +76,7 @@ no database and no domain model beyond "a job". Don't add layers it doesn't need
 | `core-relay` | `../monolith` | `relay` | One (or more, with `SKIP LOCKED`) |
 | `media-receiver` | `./media-service` | `receiver` | On concurrent uploads |
 | `media-worker` | `./media-service` | `worker` | **On CPU: this is the point** |
-| `postgres`, `redis`, `minio`, `jaeger`, `nginx` | upstream | | |
+| `postgres`, `redis`, `minio`, `jaeger` | upstream | | |
 
 ## Configuration
 
