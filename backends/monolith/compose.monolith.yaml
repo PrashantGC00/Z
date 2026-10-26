@@ -53,7 +53,7 @@ services:
       dockerfile: backends/monolith/Dockerfile
     env_file: .env
     environment:
-      DATABASE_URL: postgresql://test:testtest@postgres:5432/z_monolith
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       OTEL_EXPORTER: http://jaeger:4318/v1/traces
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://minio:9000
@@ -61,6 +61,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       jaeger: { condition: service_started }
+    stop_grace_period: 20s
     networks:
       default:
       edge:

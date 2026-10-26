@@ -1,5 +1,7 @@
 COMPOSE_FILE := compose.nginx.yaml
-MONOLITH_UPSTREAM ?= host.docker.internal:3000
+EDGE_GW := $(shell docker network inspect z_edge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null)
+
+MONOLITH_UPSTREAM ?= $(EDGE_GW):3000
 
 export MONOLITH_UPSTREAM
 

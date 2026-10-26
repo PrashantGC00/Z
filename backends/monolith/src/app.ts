@@ -9,6 +9,14 @@ import helmet from 'helmet'
 
 const app: Application = express()
 
+app.disable('x-powered-by')
+app.set('trust proxy', 1)
+
+app.use(requestLogger)
+app.use(requestContextMiddleware)
+
+app.use(helmet())
+
 app.use(
   cors({
     origin: config.CORS_ORIGINS,
@@ -19,14 +27,7 @@ app.use(
   }),
 )
 
-app.disable('x-powered-by')
-app.set('trust proxy', 1)
-app.use(helmet())
-
 app.use(express.json())
-
-app.use(requestLogger)
-app.use(requestContextMiddleware)
 
 app.use(healthRouter)
 
