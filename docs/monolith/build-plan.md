@@ -38,7 +38,7 @@ Rules for every phase:
 
 ## Phase 0 — Walking skeleton
 
-**LIVE:** `getHealth`
+**LIVE:** `getHealth` · **Status:** done 2026-10-26
 
 A thin slice through every layer, so later phases only add features.
 
@@ -59,17 +59,23 @@ A thin slice through every layer, so later phases only add features.
    Map its errors to `422` problem+json with `errors[]`.
 8. Set up CORS for `http://localhost:5173`.
 9. Write `platform/db`: a pg pool and Drizzle. Set up drizzle-kit and run a first empty
-   migration.
+   migration (`drizzle-kit generate --custom`, into `drizzle/`).
 10. Write `platform/health.ts`: `GET /v1/health` returning `{ status, architecture: "monolith",
     version, time, dependencies }`, plus `/livez` and `/readyz`.
 11. Write `platform/shutdown.ts`: graceful `SIGTERM` handling.
-12. Write `nginx/nginx.conf`: listen on `:8081` and proxy `/v1/` to `:3000`, with a body size
-    cap, timeouts and the WebSocket upgrade headers (ready for phase 8).
-13. Add the `package.json` scripts `compose`, `dev`, `migrate`, `seed`, `test`, `lint`. The
+12. Write the gateway at the repo root, `nginx/default.conf.template`: listen on `:8081` and
+    proxy `/v1/` to the API, with a body size cap, timeouts, a `429` problem+json and the
+    WebSocket upgrade headers (ready for phase 8). The upstream is a variable, so the same
+    config reaches `pnpm dev` on the host or the `app` container
+    ([ADR-0009](../adr/0009-shared-gateway-two-modes.md)).
+13. Add the `package.json` scripts `compose`, `compose:full`, `down`, `dev`, `migrate`, `seed`,
+    `test`, `lint`. The
     monolith is TypeScript only, so it needs no Makefile. Name the compose script `compose`,
     not `up`: bare `pnpm up` is pnpm's own alias for `pnpm update`.
-14. Set up the test harness: Vitest, Supertest and Testcontainers Postgres. Write one HTTP test
-    for health.
+14. Set up the test harness: Vitest, Supertest and Testcontainers Postgres (a Vitest
+    `globalSetup` that starts the container and runs the migrations). Write HTTP tests for
+    health, and for one route behind the validator (`404` and `422` problem+json), so a broken
+    spec path fails CI.
 15. Add a CI job for `backends/monolith` with path filters: lint, typecheck, tests, image
     build.
 
@@ -77,7 +83,9 @@ A thin slice through every layer, so later phases only add features.
 validation, the Postgres migration workflow.
 
 **Done when:**
-- `pnpm compose && pnpm dev`, then the app sidebar shows the monolith as **Responding**.
+- `pnpm compose && pnpm --filter monolith dev`, then the app (`pnpm dev`) shows the monolith
+  as **Responding** in the sidebar. `pnpm compose:full` runs the API in a container instead,
+  with the same result.
 - `pnpm test:contract monolith getHealth` passes.
 - A request shows up in Jaeger.
 

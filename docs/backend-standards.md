@@ -173,8 +173,9 @@ integration and HTTP tests locally and in CI.
 ## 10. Local development and delivery
 
 - **One command up:** `docker compose up` starts every dependency; another starts the app with
-  hot reload. Each backend names its common tasks the same way (`up`, `dev`, `migrate`,
-  `seed`, `test`, `lint`, `load`). A single-language TypeScript backend keeps them as
+  hot reload. Each backend names its common tasks the same way (`compose`, `dev`, `migrate`,
+  `seed`, `test`, `lint`, `load`); `compose`, not `up`, because `pnpm up` is pnpm's own
+  alias for `pnpm update`. A single-language TypeScript backend keeps them as
   `package.json` scripts. A backend with several languages adds a `Makefile` (or `justfile`)
   at its root so every service answers to the same commands.
 - **Containers:** multi-stage Dockerfiles, a non-root user, a pinned base image, a

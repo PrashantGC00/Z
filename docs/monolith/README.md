@@ -27,6 +27,24 @@ domain, finds the seams, and is reused as the core of the [hybrid](../hybrid/) b
 | Jaeger UI | 16686 | Traces |
 | Prometheus / Grafana | 9090 / 3030 | Metrics, dashboards |
 
+## Run it locally
+
+From the repo root, after `pnpm install` and copying `backends/monolith/.env.example` to `.env`:
+
+| Mode | Start | Stop | API runs |
+|---|---|---|---|
+| Dev (hot reload) | `pnpm compose`, then `pnpm --filter monolith dev` | `pnpm down` | On the host; nginx reaches it through `host.docker.internal:3000` |
+| Full | `pnpm compose:full` | `pnpm down:full` | In the `app` container; nginx reaches it as `z-monolith:3000` |
+
+Both modes serve the API at `http://localhost:8081/v1`. Check with
+`pnpm test:contract monolith` and look for `z-monolith` traces in Jaeger at
+http://localhost:16686. `pnpm --filter monolith test` starts its own Postgres with
+Testcontainers, so it needs Docker but not `pnpm compose`.
+
+**`504` from nginx in dev mode** usually means a host firewall is blocking the Docker bridge
+from reaching port 3000 (on Linux with UFW, add an allow rule for the bridge subnet). See
+[ADR-0009](../adr/0009-shared-gateway-two-modes.md) for why there are two modes.
+
 ## Milestones at a glance
 
 | Milestone | Phases | Operations LIVE | You can… |

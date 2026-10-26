@@ -37,7 +37,8 @@ The goal is also to practise several languages and databases: **Express + TypeSc
 | **Monolith + media service** | Extracting one capability (file uploads and compression) out of a monolith into its own service | 8083 |
 
 All three sit behind an nginx gateway for rate limiting and request protection, and run
-locally; no cloud account is needed. None of them is built yet.
+locally; no cloud account is needed. The monolith's walking skeleton (phase 0, `getHealth`)
+is running; the other two are not started yet.
 
 Suggested order: monolith first (learn the domain, find the seams), then microservices (cut
 along those seams), then the media service (extract one module from the monolith).
@@ -68,6 +69,8 @@ against the in-browser mock until a backend exists.
 | `pnpm test:contract <backend> [operationId...]` | Run Schemathesis contract tests against a running backend (needs [uv](https://docs.astral.sh/uv/)) |
 | `pnpm typecheck` | Regenerate API types and typecheck everything |
 | `pnpm format` | Prettier, including Tailwind class sorting |
+| `pnpm compose` / `pnpm down` | Start or stop the monolith's dependencies and the nginx gateway; run the API yourself with `pnpm --filter monolith dev` |
+| `pnpm compose:full` / `pnpm down:full` | The same, with the monolith API in a container too |
 
 Backend URLs are set in `frontend/.env.local` (copy `frontend/.env.example`).
 
@@ -137,7 +140,7 @@ api/
   swagger.ts              Swagger dev server (swagger-ui-express, run by Node directly)
   contract-test.ts        runs Schemathesis against a backend for its LIVE operations
 backends/
-  monolith/               ← to be written
+  monolith/               Express + TypeScript (phase 0 done)
   microservices/          ← to be written
   hybrid/                 ← to be written (monolith + media service)
 docs/
@@ -153,6 +156,7 @@ frontend/
   src/features/           one folder per product area (posts, chat, notifications, …)
   src/mocks/              in-browser mock backend
   src/realtime/           WebSocket client
+nginx/                    the gateway: one config template, host or container upstream (ADR-0009)
 ```
 
 ## Contributing

@@ -14,27 +14,32 @@ backends/monolith/
     app.ts                  Builds the Express app (no listen), so tests can mount it
     modules/                One folder per bounded context (below)
     platform/               Technical building blocks shared by every module (below)
-  db/
-    migrations/             drizzle-kit SQL migrations, one folder per migration, committed
-    seed/                   Idempotent seed: demo account, users, follows, posts, media
+  drizzle/                  drizzle-kit SQL migrations and meta/ snapshots, committed
   test/
-    helpers/                Test app factory, Testcontainers setup, auth helpers, builders
-    http/                   One file per contract tag: auth.test.ts, posts.test.ts, …
+    global-setup.ts         Starts a Testcontainers Postgres and runs the migrations
+    setup-env.ts            Points DATABASE_URL at that container
+    health.test.ts          One file per contract tag: auth.test.ts, posts.test.ts, …
+    helpers/                Test app factory, auth helpers, builders (from phase 1)
   load/                     k6 scripts: feed.js, fanout.js, chat.js, uploads.js
-  nginx/
-    nginx.conf              Gateway on :8081 (hand-written)
   observability/
     prometheus.yml
     grafana/                Provisioned datasources and dashboards (JSON)
-  compose.monolith.yaml     Postgres, Redis, MinIO, Jaeger, Prometheus, Grafana
+  compose.monolith.yaml     Postgres, Redis, MinIO, Jaeger (Prometheus, Grafana in phase 12);
+                            the app itself only with the `full` profile
   Dockerfile                Multi-stage, non-root; one image, three entrypoints
+  vitest.config.ts
   .dependency-cruiser.cjs   Boundary rules (below)
   drizzle.config.ts
   .env.example
-  package.json              Scripts: compose, dev, worker, migrate, seed, test, lint, load
-  tsconfig.json
+  package.json              Scripts: compose, compose:full, down, dev, worker, migrate, seed,
+                            test, lint, load
+  tsconfig.json             tsconfig.build.json emits src/ to dist/
   README.md
 ```
+
+The gateway is not part of this folder. It lives at the repo root in `nginx/`, shared by every
+backend, and proxies either to `pnpm dev` on the host or to the `app` container
+([ADR-0009](../adr/0009-shared-gateway-two-modes.md)).
 
 `main.ts`, `worker.ts` and `relay.ts` share one codebase and one image, and differ only by
 entrypoint. You can scale API processes and workers independently without separate builds.
@@ -102,6 +107,7 @@ Write an ADR when you move it.
 src/platform/
   config.ts                 Env schema (Zod), parsed once, typed export
   logger.ts                 pino with trace id mixin and Authorization redaction
+  request-context.ts        AsyncLocalStorage: request id, trace id (user id from phase 1)
   telemetry.ts              OpenTelemetry SDK: HTTP, Express, pg, ioredis instrumentation
   http/
     problem.ts              ProblemError type and the single error-to-problem+json handler
@@ -111,9 +117,10 @@ src/platform/
     etag.ts                 ETag / If-Match helpers
     pagination.ts           Cursor encode/decode, limit clamp, page envelope
     rate-limit.ts           Redis token bucket for login, register, refresh
-    request-context.ts      AsyncLocalStorage: trace id, user id
   db/
     client.ts               pg pool + Drizzle instance
+    schema.ts               Re-exports every module's infra/schema.ts for drizzle-kit
+    seed/seed.ts            Idempotent seed: demo account, users, follows, posts, media
     transaction.ts          Unit-of-work helper that also collects outbox events
   redis.ts                  ioredis clients (commands, pub, sub)
   storage.ts                S3 client for MinIO, pre-signing helpers
@@ -150,29 +157,34 @@ src/platform/
 |---|---|---|
 | `NODE_ENV` | `development` | all |
 | `PORT` | `3000` | main |
+| `VERSION`, `ARCH` | `0.0.1`, `monolith` | `/v1/health` |
+| `OPENAPI_SPEC` | `../../api/openapi.yaml` (`/app/api/openapi.yaml` in the image) | validator |
 | `PUBLIC_BASE_URL` | `http://localhost:8081/v1` | ticket URLs, media URLs |
 | `CORS_ORIGINS` | `http://localhost:5173` | main |
 | `DATABASE_URL` | `postgres://z:z@localhost:5432/z` | all |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `z_monolith`, … | compose (Postgres container) |
 | `REDIS_URL` | `redis://localhost:6379` | all |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | `http://localhost:9000`, … | main, worker |
 | `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `JWT_ISSUER`, `JWT_AUDIENCE` | PEM, `z-monolith`, `z` | main |
 | `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL` | `15m`, `30d` | main |
 | `FEED_CELEBRITY_THRESHOLD`, `TIMELINE_MAX` | `10000`, `800` | worker, main |
 | `MEDIA_ADAPTER` | `local` (`remote` in the hybrid core) | main, worker |
-| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | `http://localhost:4318`, `z-monolith` | all |
+| `OTEL_EXPORTER` | `http://localhost:4318/v1/traces` | all (service name `z-monolith` is set in code) |
 | `LOG_LEVEL` | `info` | all |
 
 ## Request lifecycle
 
 ```
 nginx :8081 (rate limit, body cap, request id)
-  → request-context (trace id, AsyncLocalStorage)
-  → pino-http access log
-  → CORS
+  → CORS, helmet, JSON body parser
+  → pino-http access log (request id from X-Request-Id or a new UUID)
+  → request-context (request id, AsyncLocalStorage; trace id from the active span)
+  → /v1/health, /livez, /readyz (mounted before the validator)
   → openapi validator (shape of params, query and body)
   → auth (JWT → req.user) where the operation needs it
   → idempotency / If-Match where the operation uses them
   → module router → use case → repositories (one transaction + outbox rows)
   → presenter → JSON response
-  → problem handler for anything thrown
+  → 404 catch-all (problem+json) for routes nothing matched
+  → problem handler for anything thrown (validator errors become 422 with errors[])
 ```
