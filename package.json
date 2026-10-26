@@ -12,12 +12,12 @@
     "dev:web": "pnpm --filter z-frontend dev",
     "doc:api": "node --watch api/swagger.ts",
     "build:web": "pnpm --filter z-frontend build",
-    "lint": "pnpm --filter z-frontend lint && pnpm lint:api",
+    "lint": "pnpm --filter z-frontend --filter monolith lint && pnpm lint:api",
     "test": "pnpm --filter z-frontend test",
     "test:contract": "node api/contract-test.ts",
     "typecheck": "pnpm --filter z-frontend typecheck && tsc -p tsconfig.json",
-    "format": "pnpm --filter z-frontend format",
-    "format:check": "pnpm --filter z-frontend format:check",
+    "format": "pnpm --filter z-frontend --filter monolith format",
+    "format:check": "pnpm --filter z-frontend --filter monolith format:check",
     "lint:api": "redocly lint api/openapi.yaml"
   },
   "devDependencies": {

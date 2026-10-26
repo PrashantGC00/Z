@@ -1,3 +1,8 @@
 {
-  "api/openapi.yaml": "redocly lint"
+  "api/openapi.yaml": "redocly lint",
+  "backends/monolith/**/*.{ts,mjs,js}": [
+    "pnpm --dir backends/monolith exec eslint --fix --max-warnings=0 --no-warn-ignored",
+    "pnpm --dir backends/monolith exec prettier --write --ignore-unknown"
+  ],
+  "backends/monolith/**/*.{json,md,yaml,yml}": "pnpm --dir backends/monolith exec prettier --write --ignore-unknown"
 }

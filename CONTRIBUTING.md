@@ -20,13 +20,14 @@ the commit. The README covers what the project is and how to run it.
 
 ```bash
 pnpm typecheck    # regenerates API types, typechecks the frontend and api/ scripts
-pnpm lint         # ESLint + Redocly lint of the contract
+pnpm lint         # ESLint (frontend, monolith) + Redocly lint of the contract
 pnpm test         # frontend unit tests
-pnpm format       # Prettier (frontend)
+pnpm format       # Prettier (frontend, monolith)
 ```
 
 A pre-commit hook (husky + lint-staged) already runs ESLint with `--fix` and Prettier on the
-staged frontend files, and Redocly when `api/openapi.yaml` is staged. It is installed by
+staged frontend and monolith files, each with its own package's config, and Redocly when
+`api/openapi.yaml` is staged. It is installed by
 `pnpm install` once the repo is a git repository. It only sees staged files, so typecheck and
 tests still need running by hand. Skip it with `git commit --no-verify` only for a work-in-progress
 commit on your own branch.
