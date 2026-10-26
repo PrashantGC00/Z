@@ -15,7 +15,8 @@ the commit. The README covers what the project is and how to run it.
    backend code it explains problems and may show short snippets, but it never edits backend
    files: you write the fix.
    On GitHub, `claude[bot]` posts the same review when a pull request is opened, reopened or
-   marked ready (`.github/workflows/claude-review.yml`). Comment `@claude review again`, or
+   marked ready (`.github/workflows/claude-review.yml`): each finding becomes an issue labelled
+   `claude-review`, and the PR gets one short summary. Comment `@claude review again`, or
    `@claude` with a question, for another pass. The bot can't edit files or push commits,
    and its review doesn't count as a required approval.
 5. Merge into `main` and delete the branch.

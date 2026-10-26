@@ -1,4 +1,5 @@
-# Reviews each pull request as claude[bot], following the /z-review skill.
+# Reviews each pull request as claude[bot], following the /z-review skill. Findings become
+# GitHub issues (label claude-review); the PR gets one short summary comment.
 # Review only: the bot cannot edit files or push, so backend code stays hand-written
 # (README "AI disclosure"). Ask for a re-review by commenting "@claude review again".
 name: Claude review
@@ -14,6 +15,7 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write
+  issues: write # findings are filed as issues
   id-token: write
   actions: read # lets Claude read the CI results it links to
 
@@ -39,18 +41,33 @@ jobs:
             PR NUMBER: ${{ github.event.pull_request.number }}
 
             Review this pull request. First read CLAUDE.md, the "AI disclosure" section of
-            README.md and .claude/skills/z-review/SKILL.md, and follow the skill: its modes,
-            references, priorities, verification rule and report format.
+            README.md and .claude/skills/z-review/SKILL.md, and follow the skill's modes,
+            references, priorities and verification rule. Its report format is replaced by
+            the output rules below.
 
             - Files under backends/, nginx/, Dockerfiles, compose files, migrations and other
-              backend infra are TUTOR mode: point at file:line, explain, ask guiding
-              questions, and show at most short snippets (about 15 lines, one idea). Never
-              give whole files, handlers or ready-to-apply diffs or suggestion blocks.
-            - Everything else (frontend/, api/, docs/, root tooling) is fixer mode: concrete
-              fixes are fine, as suggestions only.
-            - Don't run the checks; CI runs them. Read the PR's check results and link them.
-            - Get the diff with `gh pr diff`, and post the report as one comment with
-              `gh pr comment`. Use inline comments only for findings tied to a line.
+              backend infra are TUTOR mode: point at file:line, explain, ask a guiding
+              question, and show at most a short snippet (about 15 lines, one idea). Never
+              whole files, handlers or ready-to-apply diffs or suggestion blocks.
+            - Everything else (frontend/, api/, docs/, root tooling) is fixer mode: a concrete
+              fix is fine, as a suggestion only.
+            - Don't run the checks; CI runs them. Read them with `gh pr checks`.
+            - Get the diff with `gh pr diff`.
+
+            Output rules (keep it short):
+            1. Each Blocker or Should-fix finding becomes one GitHub issue. First run
+               `gh issue list --label claude-review --state open` and skip any finding already
+               filed. Create with
+               `gh issue create --label claude-review --title "<file>: <problem>" --body "..."`.
+               The body is at most 10 lines: `file:line`, why it matters (1-2 sentences), what
+               to look at (a hint, not a fix, in tutor mode), and "Found in #<PR NUMBER>".
+            2. Then post ONE PR comment with `gh pr comment`, at most 15 lines:
+               - the verdict (Ready / Ready after fixes / Not ready) in one line;
+               - one line per issue you created or found already open: `#<n> <title>`;
+               - at most 3 one-line "Consider" notes, with no issues for them;
+               - the CI result in one line.
+               No other sections, no restating the code, no "what's good" list.
+            3. No inline comments.
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
+            --allowedTools "Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*),Bash(gh issue create:*),Bash(gh issue list:*)"
             --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
