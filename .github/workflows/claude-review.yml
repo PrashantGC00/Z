@@ -1,0 +1,57 @@
+# Reviews each pull request as claude[bot], following the /z-review skill.
+# Review only: the bot cannot edit files or push, so backend code stays hand-written
+# (README "AI disclosure"). Ask for a re-review by commenting "@claude review again".
+name: Claude review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+  actions: read # lets Claude read the CI results it links to
+
+jobs:
+  review:
+    name: Review the pull request
+    # Dependabot PRs get no secrets, and drafts aren't ready for review.
+    if: github.event.pull_request.draft == false && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Actions are pinned to commit SHAs; the comment says which release that is.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1.0.262
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          use_sticky_comment: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. First read CLAUDE.md, the "AI disclosure" section of
+            README.md and .claude/skills/z-review/SKILL.md, and follow the skill: its modes,
+            references, priorities, verification rule and report format.
+
+            - Files under backends/, nginx/, Dockerfiles, compose files, migrations and other
+              backend infra are TUTOR mode: point at file:line, explain, ask guiding
+              questions, and show at most short snippets (about 15 lines, one idea). Never
+              give whole files, handlers or ready-to-apply diffs or suggestion blocks.
+            - Everything else (frontend/, api/, docs/, root tooling) is fixer mode: concrete
+              fixes are fine, as suggestions only.
+            - Don't run the checks; CI runs them. Read the PR's check results and link them.
+            - Get the diff with `gh pr diff`, and post the report as one comment with
+              `gh pr comment`. Use inline comments only for findings tied to a line.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
+            --disallowedTools "Edit,Write,MultiEdit,NotebookEdit"
