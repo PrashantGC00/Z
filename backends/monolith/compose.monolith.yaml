@@ -1,0 +1,76 @@
+name: z_monolith
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports: ['127.0.0.1:5432:5432']
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ['127.0.0.1:6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${S3_BUCKET:-media}
+    ports: ['127.0.0.1:9000:9000', '127.0.0.1:9001:9001']
+    volumes: [minio_data:/bitnami/minio/data]
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  jaeger:
+    image: jaegertracing/jaeger:2.5.0
+    ports:
+      - '127.0.0.1:16686:16686'
+      - '127.0.0.1:4318:4318'
+
+  app:
+    profiles: [full]
+    build:
+      context: ../..
+      dockerfile: backends/monolith/Dockerfile
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://test:testtest@postgres:5432/z_monolith
+      OTEL_EXPORTER: http://jaeger:4318/v1/traces
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://minio:9000
+    ports: ['127.0.0.1:3000:3000']
+    depends_on:
+      postgres: { condition: service_healthy }
+      jaeger: { condition: service_started }
+    networks:
+      default:
+      edge:
+        aliases: [z-monolith]
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  default:
+  edge:
+    name: z_edge
