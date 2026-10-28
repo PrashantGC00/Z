@@ -1,0 +1,14 @@
+{
+  "name": "hybrid",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "compose": "docker compose -f compose.hybrid.yaml up -d --build",
+    "down": "docker compose -f compose.hybrid.yaml down"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module"
+}
