@@ -25,9 +25,9 @@ behaviour changes underneath.
 ## Phase 0 — The core on its own stack
 
 **Steps:**
-1. Write `backends/hybrid/docker-compose.yml`. Build the core from `../monolith` and run
-   `api` with `MEDIA_ADAPTER=local` for now (add `worker` and `relay` once monolith phase 5
-   has them). Give it its own Postgres,
+1. Write `backends/hybrid/compose.hybrid.yaml` (project `z_hybrid`). Build the core from the
+   monolith Dockerfile and run it as `core-api` with `MEDIA_ADAPTER=local` for now (add
+   `core-worker` and `core-relay` once monolith phase 5 has them). Give it its own Postgres,
    Redis and MinIO ([ADR-0008](../adr/0008-minio-image.md) image) on the
    [offset ports](README.md#ports), plus Jaeger.
 2. Add a `:8083` server block to the root `nginx/default.conf.template`, with its own upstream

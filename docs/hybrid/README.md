@@ -35,7 +35,7 @@ The hybrid stack runs alongside the monolith's, so its host ports are offset.
 | PostgreSQL | 5433 | The core's own database, separate from the monolith's |
 | Redis | 6380 | Shared by core and media service (queues) |
 | MinIO API / console | 9002 / 9003 | |
-| Jaeger UI | 16687 | One trace across both processes |
+| Jaeger UI / OTLP | 16687 / 4319 | One trace across both processes. Containers export to `jaeger:4318` |
 
 ## Milestones at a glance
 
