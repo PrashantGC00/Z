@@ -7,7 +7,7 @@ import { register } from 'node:module'
 
 register('@opentelemetry/instrumentation/hook.mjs', import.meta.url)
 export const telemetry = new NodeSDK({
-  serviceName: 'z-monolith',
+  serviceName: config.OTEL_SERVICE_NAME,
   traceExporter: new OTLPTraceExporter({ url: config.OTEL_EXPORTER }),
   instrumentations: [
     getNodeAutoInstrumentations({
