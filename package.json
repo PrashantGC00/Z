@@ -19,10 +19,10 @@
     "format": "pnpm --filter z-frontend --filter monolith format",
     "format:check": "pnpm --filter z-frontend --filter monolith format:check",
     "lint:api": "redocly lint api/openapi.yaml",
-    "compose": "pnpm --filter monolith compose && make -C ./nginx up",
-    "down": "pnpm --filter monolith down && make -C ./nginx down",
-    "compose:full": "pnpm --filter monolith compose:full && make -C ./nginx full",
-    "down:full": "pnpm --filter monolith down:full && make -C ./nginx down"
+    "compose": "pnpm --filter monolith compose && pnpm --filter hybrid compose && make -C ./nginx up",
+    "down": "pnpm --filter monolith down && pnpm --filter hybrid down && make -C ./nginx down",
+    "compose:full": "pnpm --filter monolith compose:full && pnpm --filter hybrid compose && make -C ./nginx full",
+    "down:full": "pnpm --filter monolith down:full && pnpm --filter hybrid down && make -C ./nginx down"
   },
   "devDependencies": {
     "@redocly/cli": "^2.71.0",

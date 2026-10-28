@@ -54,8 +54,8 @@ backends/hybrid/
   load/
     uploads.js              k6: concurrent image uploads end to end
   observability/            Prometheus scrape config, Grafana dashboard for queues and workers
-  docker-compose.yml        Core (api, worker, relay) from ../monolith, media receiver and worker,
-                            Postgres, Redis, MinIO, Jaeger
+  compose.hybrid.yaml       Core (core-api, core-worker, core-relay) from the monolith image,
+                            media receiver and worker, Postgres, Redis, MinIO, Jaeger
   Makefile                  up, dev, test, load, chaos-* targets
   README.md
 ```

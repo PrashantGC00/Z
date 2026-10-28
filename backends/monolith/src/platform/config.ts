@@ -19,9 +19,10 @@ const schema = z.object({
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),
   VERSION: z.string().min(1).default('0.0.0'),
-  ARCH: z.string().min(1).default('monolith'),
+  ARCH: z.enum(['monolith', 'hybrid']).default('monolith'),
   OTEL_EXPORTER: z.url(),
   OPENAPI_SPEC: z.string().default('../../api/openapi.yaml'),
+  OTEL_SERVICE_NAME: z.string().min(1).default('z-monolith'),
 })
 
 const parsed = schema.safeParse(process.env)

@@ -2,6 +2,7 @@ packages:
   - frontend
   # TypeScript backends join the workspace when they exist, e.g.:
   - backends/monolith
+  - backends/hybrid
   # - backends/microservices/services/gateway
 
 # Install scripts are opt-in. None of these are needed: swagger-ui telemetry, optional native
