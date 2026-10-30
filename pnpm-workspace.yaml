@@ -3,7 +3,7 @@ packages:
   # TypeScript backends join the workspace when they exist, e.g.:
   - backends/monolith
   - backends/hybrid
-  # - backends/microservices/services/gateway
+  - backends/microservices/services/identity-svc
 
 # Install scripts are opt-in. None of these are needed: swagger-ui telemetry, optional native
 # YAML/JSON parsers, MSW's worker copy (the worker is committed in frontend/public) and
