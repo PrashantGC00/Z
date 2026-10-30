@@ -144,7 +144,7 @@ api/
 backends/
   monolith/               Express + TypeScript (phase 0 done)
   microservices/          ← to be written
-  hybrid/                 ← to be written (monolith + media service)
+  hybrid/                 the monolith image as the core + a media service (phase 0 done)
 docs/
   system-design.md        requirements, capacity estimates, data model, core flows
   backend-standards.md    the engineering bar every backend meets

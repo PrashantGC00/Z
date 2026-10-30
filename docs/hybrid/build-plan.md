@@ -24,6 +24,8 @@ behaviour changes underneath.
 
 ## Phase 0 — The core on its own stack
 
+**LIVE:** `getHealth` · **Status:** done 2026-10-28
+
 **Steps:**
 1. Write `backends/hybrid/compose.hybrid.yaml` (project `z_hybrid`). Build the core from the
    monolith Dockerfile and run it as `core-api` with `MEDIA_ADAPTER=local` for now (add
