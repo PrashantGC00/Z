@@ -32,7 +32,11 @@ func TestReadyz(t *testing.T) {
 		server := newServer(pool)
 
 		response := sendReadyz(t, server)
-		defer response.Body.Close()
+		defer func() {
+			if err := response.Body.Close(); err != nil {
+				t.Errorf("close response body: %v", err)
+			}
+		}()
 
 		if response.StatusCode != http.StatusOK {
 			t.Fatalf("expected status %d, got %d", http.StatusOK, response.StatusCode)
@@ -55,7 +59,11 @@ func TestReadyz(t *testing.T) {
 		server := newServer(pool)
 
 		response := sendReadyz(t, server)
-		defer response.Body.Close()
+		defer func() {
+			if err := response.Body.Close(); err != nil {
+				t.Errorf("close response body: %v", err)
+			}
+		}()
 
 		if response.StatusCode != http.StatusServiceUnavailable {
 			t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, response.StatusCode)
