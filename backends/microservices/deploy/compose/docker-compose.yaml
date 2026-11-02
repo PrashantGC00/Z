@@ -31,11 +31,12 @@ services:
     build:
       context: ../../../..
       dockerfile: backends/microservices/services/identity-svc/Dockerfile
+    env_file: .env
     environment:
       DATABASE_URL: postgres://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity?sslmode=disable
       HEALTH_SERVICES: graph=http://graph-svc:4002
       OTEL_EXPORTER: http://jaeger:4318/v1/traces
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8090}
     ports:
       - "127.0.0.1:4001:4001"
     stop_grace_period: 20s

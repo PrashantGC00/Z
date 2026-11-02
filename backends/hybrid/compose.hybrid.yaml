@@ -63,7 +63,7 @@ services:
     stop_grace_period: 20s
     networks:
       default:
-      edge:
+      z_edge:
         aliases: [z-hybrid]
 
 volumes:
@@ -71,6 +71,5 @@ volumes:
   minio_data:
 
 networks:
-  default:
-  edge:
-    name: z_edge
+  z_edge:
+    external: true
