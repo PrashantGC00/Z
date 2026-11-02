@@ -19,7 +19,8 @@ func accessLogMiddleware(logger *slog.Logger) fiber.Handler {
 			}
 		}
 
-		logger.Info(
+		logger.InfoContext(
+			c.Context(),
 			"http request",
 			"request_id", requestid.FromContext(c),
 			"method", c.Method(),

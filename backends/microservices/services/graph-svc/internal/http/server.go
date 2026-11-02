@@ -3,8 +3,10 @@ package http
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"time"
 
+	fiberotel "github.com/gofiber/contrib/v3/otel"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 )
@@ -26,6 +28,10 @@ type Server struct {
 	logger       *slog.Logger
 }
 
+func (s *Server) Test(req *http.Request, config ...fiber.TestConfig) (*http.Response, error) {
+	return s.app.Test(req, config...)
+}
+
 func New(opts Options) *Server {
 	app := fiber.New(fiber.Config{
 		ErrorHandler: errorHandler(opts.Logger),
@@ -34,6 +40,13 @@ func New(opts Options) *Server {
 	app.Use(requestid.New(requestid.Config{
 		Header: "X-Request-ID",
 	}))
+
+	app.Use(fiberotel.New(
+		fiberotel.WithNext(func(c fiber.Ctx) bool {
+			return c.Path() == "/livez"
+		}),
+	))
+
 	app.Use(accessLogMiddleware(opts.Logger))
 
 	server := &Server{
@@ -49,11 +62,12 @@ func New(opts Options) *Server {
 }
 
 func (s *Server) readyz(c fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c, s.readyTimeout)
+	ctx, cancel := context.WithTimeout(c.Context(), s.readyTimeout)
 	defer cancel()
 
 	if err := s.pinger.Ping(ctx); err != nil {
-		s.logger.Warn(
+		s.logger.WarnContext(
+			ctx,
 			"readiness check failed",
 			"error", err,
 			"request_id", requestid.FromContext(c),

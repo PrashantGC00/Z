@@ -6,6 +6,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -22,12 +23,20 @@ type Problem struct {
 }
 
 func writeProblem(c fiber.Ctx, status int, title, detail string) error {
+	spanContext := trace.SpanContextFromContext(c.Context())
+
+	traceID := ""
+	if spanContext.IsValid() {
+		traceID = spanContext.TraceID().String()
+	}
+
 	return c.Status(status).JSON(Problem{
 		Type:     "about:blank",
 		Title:    title,
 		Status:   status,
 		Detail:   detail,
 		Instance: c.Path(),
+		TraceID:  traceID,
 	}, problemContentType)
 }
 
@@ -46,7 +55,9 @@ func errorHandler(logger *slog.Logger) fiber.ErrorHandler {
 		}
 
 		if status >= 500 {
-			logger.Error("http request failed",
+			logger.ErrorContext(
+				c.Context(),
+				"http request failed",
 				"error", err,
 				"request_id", requestid.FromContext(c),
 			)

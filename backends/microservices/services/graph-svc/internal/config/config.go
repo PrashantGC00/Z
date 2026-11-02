@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -12,11 +13,13 @@ import (
 )
 
 type Config struct {
-	Port            int           `env:"PORT" envDefault:"8080"`
+	Port            int           `env:"PORT" envDefault:"4002"`
 	LogLevel        string        `env:"LOG_LEVEL" envDefault:"info"`
 	DatabaseURL     string        `env:"DATABASE_URL,required,notEmpty"`
 	ReadyTimeout    time.Duration `env:"READY_TIMEOUT" envDefault:"2s"`
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" envDefault:"10s"`
+	OTelServiceName string        `env:"OTEL_SERVICE_NAME" envDefault:"graph-svc"`
+	OTelExporter    string        `env:"OTEL_EXPORTER,required,notEmpty"`
 }
 
 func Load() (Config, error) {
@@ -58,6 +61,16 @@ func (cfg Config) Validate() error {
 
 	if cfg.ShutdownTimeout <= 0 {
 		errs = append(errs, errors.New("SHUTDOWN_TIMEOUT must be greater than 0"))
+	}
+
+	if strings.TrimSpace(cfg.OTelServiceName) == "" {
+		errs = append(errs, errors.New("OTEL_SERVICE_NAME must not be empty"))
+	}
+
+	endpoint, err := url.Parse(cfg.OTelExporter)
+	if err != nil || endpoint.Host == "" ||
+		(endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+		errs = append(errs, errors.New("OTEL_EXPORTER must be a valid HTTP(S) URL"))
 	}
 
 	return errors.Join(errs...)

@@ -7,11 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/PrashantGC00/z/backends/microservices/services/graph-svc/internal/config"
 	httpServer "github.com/PrashantGC00/z/backends/microservices/services/graph-svc/internal/http"
 	"github.com/PrashantGC00/z/backends/microservices/services/graph-svc/internal/platform"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -35,18 +35,39 @@ func run() error {
 	logger := platform.NewLogger(level)
 	slog.SetDefault(logger)
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
-	if err != nil {
-		return fmt.Errorf("create database pool: %w", err)
-	}
-	defer pool.Close()
-
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
 		syscall.SIGTERM,
 	)
 	defer stop()
+
+	shutdownTracer, err := platform.InitTracer(
+		ctx,
+		cfg.OTelServiceName,
+		cfg.OTelExporter,
+	)
+	if err != nil {
+		return fmt.Errorf("init tracer: %w", err)
+	}
+
+	defer func() {
+		sctx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+
+		if err := shutdownTracer(sctx); err != nil {
+			logger.Error("shutdown tracer", "error", err)
+		}
+	}()
+
+	pool, err := platform.NewDatabase(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("initialize database: %w", err)
+	}
+	defer pool.Close()
 
 	server := httpServer.New(httpServer.Options{
 		Logger:       logger,
