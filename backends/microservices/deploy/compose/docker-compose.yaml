@@ -1,0 +1,75 @@
+name: z_microservices
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set IDENTITY_DB_PASSWORD in .env}
+      GRAPH_DB_PASSWORD: ${GRAPH_DB_PASSWORD:?set GRAPH_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  jaeger:
+    image: jaegertracing/jaeger:2.5.0
+    ports:
+      - "127.0.0.1:16688:16686"
+      - "127.0.0.1:4320:4318"
+
+  identity-svc:
+    build:
+      context: ../../../..
+      dockerfile: backends/microservices/services/identity-svc/Dockerfile
+    environment:
+      DATABASE_URL: postgres://identity:${IDENTITY_DB_PASSWORD}@postgres:5432/identity?sslmode=disable
+      HEALTH_SERVICES: graph=http://graph-svc:4002
+      OTEL_EXPORTER: http://jaeger:4318/v1/traces
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    ports:
+      - "127.0.0.1:4001:4001"
+    stop_grace_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    networks:
+      default:
+      z_edge:
+        aliases:
+          - z-identity
+
+  graph-svc:
+    build:
+      context: ../../services/graph-svc
+    environment:
+      DATABASE_URL: postgres://graph:${GRAPH_DB_PASSWORD}@postgres:5432/graph?sslmode=disable
+      OTEL_EXPORTER: http://jaeger:4318/v1/traces
+    ports:
+      - "127.0.0.1:4002:4002"
+    stop_grace_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    networks:
+      - default
+
+volumes:
+  pgdata:
+
+networks:
+  z_edge:
+    external: true
