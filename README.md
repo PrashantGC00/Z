@@ -73,6 +73,7 @@ against the in-browser mock until a backend exists.
 | `pnpm format` | Prettier, including Tailwind class sorting |
 | `pnpm compose` / `pnpm down` | Start or stop the monolith's dependencies and the nginx gateway; run the API yourself with `pnpm --filter monolith dev` |
 | `pnpm compose:full` / `pnpm down:full` | The same, with the monolith API in a container too |
+| `pnpm compose:microservices` / `pnpm down:microservices` | Start or stop only the microservices stack (identity-svc, graph-svc, Postgres, Jaeger). The two commands above include it; it always runs in containers |
 
 Backend URLs are set in `frontend/.env.local` (copy `frontend/.env.example`).
 
