@@ -1,0 +1,61 @@
+name: microservices.graph
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backends/microservices/services/graph-svc/**'
+      - '.github/workflows/ci.graph.yml'
+  pull_request:
+    paths:
+      - 'backends/microservices/services/graph-svc/**'
+      - '.github/workflows/ci.graph.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  graph:
+    name: graph-svc
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backends/microservices/services/graph-svc
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backends/microservices/services/graph-svc/go.mod
+          cache-dependency-path: backends/microservices/services/graph-svc/go.sum
+
+      - name: Format
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "Run gofmt -w on:"; echo "$unformatted"; exit 1
+          fi
+
+      - name: go mod tidy
+        run: go mod tidy -diff
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          working-directory: backends/microservices/services/graph-svc
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Image build
+        run: docker buildx build -t z_graph .
