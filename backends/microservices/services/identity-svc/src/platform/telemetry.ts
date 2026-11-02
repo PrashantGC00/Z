@@ -11,6 +11,13 @@ export const telemetry = new NodeSDK({
   instrumentations: [
     getNodeAutoInstrumentations({
       '@opentelemetry/instrumentation-fs': { enabled: false },
+      '@opentelemetry/instrumentation-http': {
+        ignoreIncomingRequestHook: (request) => {
+          const url = request.url || ''
+
+          return url.startsWith('/livez')
+        },
+      },
     }),
   ],
 })
