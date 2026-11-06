@@ -35,6 +35,13 @@ jobs:
           node-version: 24
           cache: pnpm
 
+      - name: Generate throwaway JWT key pair
+        run: |
+          openssl genpkey -algorithm ed25519 -out "$RUNNER_TEMP/jwt.pem"
+          openssl pkey -in "$RUNNER_TEMP/jwt.pem" -pubout -out "$RUNNER_TEMP/jwt.pub.pem"
+          echo "JWT_PRIVATE_KEY=$(base64 -w0 "$RUNNER_TEMP/jwt.pem")" >> "$GITHUB_ENV"
+          echo "JWT_PUBLIC_KEY=$(base64 -w0 "$RUNNER_TEMP/jwt.pub.pem")" >> "$GITHUB_ENV"
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
