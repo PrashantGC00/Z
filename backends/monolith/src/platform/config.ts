@@ -7,6 +7,11 @@ const csv = z.string().transform((s) =>
     .filter(Boolean),
 )
 
+const pem = z
+  .string()
+  .min(1)
+  .transform((s) => Buffer.from(s, 'base64').toString('utf8'))
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -23,6 +28,12 @@ const schema = z.object({
   OTEL_EXPORTER: z.url(),
   OPENAPI_SPEC: z.string().default('../../api/openapi.yaml'),
   OTEL_SERVICE_NAME: z.string().min(1).default('z-monolith'),
+  JWT_PRIVATE_KEY: pem,
+  JWT_PUBLIC_KEY: pem,
+  JWT_ISSUER: z.string().min(1).default('z-monolith'),
+  JWT_AUDIENCE: z.string().min(1).default('z'),
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(2_592_000),
 })
 
 const parsed = schema.safeParse(process.env)
