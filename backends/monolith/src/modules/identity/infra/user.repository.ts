@@ -1,0 +1,25 @@
+import { db } from '../../../platform/db/client.ts'
+import { isUniqueViolation } from '../../../platform/db/errors.ts'
+import type { UserRepository } from '../application/ports.ts'
+import { EmailTaken, UsernameTaken } from '../domain/errors.ts'
+import { credentials, refreshTokens, users } from './schema.ts'
+
+export const userRepository: UserRepository = {
+  async createAccount(account) {
+    try {
+      return await db.transaction(async (tx) => {
+        const [user] = await tx.insert(users).values(account.user).returning()
+
+        await tx.insert(credentials).values({ passwordHash: account.passwordHash, userId: account.user.id })
+        await tx.insert(refreshTokens).values({ ...account.refreshToken, userId: account.user.id })
+
+        return user!
+      })
+    } catch (err) {
+      if (isUniqueViolation(err, 'users_email_unique')) throw new EmailTaken()
+      if (isUniqueViolation(err, 'users_username_unique')) throw new UsernameTaken()
+
+      throw err
+    }
+  },
+}

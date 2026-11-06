@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, Response } from 'express'
 import { STATUS_CODES } from 'node:http'
 import { logger } from '../logger.js'
 import { getTraceId } from '../request-context.js'
+import { DrizzleQueryError } from 'drizzle-orm'
 
 export type ProblemDetails = {
   type: string
@@ -67,7 +68,9 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
   const status = typeof error?.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : 500
 
   if (status >= 500) {
-    logger.error({ err: error, ...base }, 'unhandled error')
+    const logged = error instanceof DrizzleQueryError ? error.cause : error
+
+    logger.error({ err: logged, ...base }, 'unhandled error')
     return send(res, { type: 'about:blank', title: 'Internal Server Error', status, ...base })
   }
 

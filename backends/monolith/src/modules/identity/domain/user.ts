@@ -3,6 +3,24 @@ export type Invalid = {
   message: string
 }
 
+export type User = {
+  id: string
+  email: string
+  username: string
+  displayName: string
+  bio: string | null
+  location: string | null
+  website: string | null
+  avatarMediaId: string | null
+  coverMediaId: string | null
+  verified: boolean
+  postsCount: number
+  followersCount: number
+  followingCount: number
+  createdAt: Date
+  updatedAt: Date
+}
+
 const RESERVED_USERNAMES = new Set(['admin', 'root', 'api', 'settings', 'support'])
 
 export function normalizeEmail(email: string): string {
