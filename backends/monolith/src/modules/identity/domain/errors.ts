@@ -1,3 +1,5 @@
+import type { Invalid } from './user.ts'
+
 export class EmailTaken extends Error {
   constructor() {
     super('Email is already taken')
@@ -9,5 +11,12 @@ export class UsernameTaken extends Error {
   constructor() {
     super('Username is already taken')
     this.name = 'UsernameTaken'
+  }
+}
+
+export class ValidationFailed extends Error {
+  constructor(readonly errors: Invalid[]) {
+    super('Validation failed')
+    this.name = 'ValidationFailed'
   }
 }

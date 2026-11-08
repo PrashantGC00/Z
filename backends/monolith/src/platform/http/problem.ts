@@ -41,6 +41,19 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
     res.set(error.headers)
   }
 
+  const badJson = error?.type === 'entity.parse.failed'
+  const notJson = error?.status === 415
+
+  if (badJson || notJson) {
+    return send(res, {
+      type: 'about:blank',
+      title: 'Validation failed',
+      status: 422,
+      errors: [{ field: 'body', message: badJson ? 'must be valid JSON' : 'must be application/json' }],
+      ...base,
+    })
+  }
+
   if (error?.status === 400 && Array.isArray(error.errors)) {
     return send(res, {
       type: 'about:blank',
