@@ -1,5 +1,7 @@
 import type { User } from '../domain/user.ts'
 
+export type NewRefreshToken = NewAccount['refreshToken'] & { userId: string }
+
 export interface PasswordHasher {
   hash(password: string): Promise<string>
   verify(encoded: string | null, password: string): Promise<boolean>
@@ -23,4 +25,8 @@ export interface NewAccount {
 export interface UserRepository {
   createAccount(account: NewAccount): Promise<User>
   findByEmail(email: string): Promise<{ user: User; passwordHash: string } | null>
+}
+
+export interface RefreshTokenRepository {
+  create(token: NewRefreshToken): Promise<void>
 }
