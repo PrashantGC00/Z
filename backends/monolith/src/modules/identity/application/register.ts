@@ -10,7 +10,7 @@ import {
 import type { AccessTokenIssuer, PasswordHasher, RefreshTokenGenerator, UserRepository } from './ports.ts'
 
 export type RegisterDeps = {
-  users: UserRepository
+  users: Pick<UserRepository, 'createAccount'>
   hasher: PasswordHasher
   accessTokens: AccessTokenIssuer
   refreshTokens: RefreshTokenGenerator

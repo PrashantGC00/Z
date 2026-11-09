@@ -22,4 +22,5 @@ export interface NewAccount {
 
 export interface UserRepository {
   createAccount(account: NewAccount): Promise<User>
+  findByEmail(email: string): Promise<{ user: User; passwordHash: string } | null>
 }

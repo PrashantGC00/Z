@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { db } from '../../../platform/db/client.ts'
 import { isUniqueViolation } from '../../../platform/db/errors.ts'
 import type { UserRepository } from '../application/ports.ts'
@@ -21,5 +22,19 @@ export const userRepository: UserRepository = {
 
       throw err
     }
+  },
+
+  async findByEmail(email) {
+    const result = await db
+      .select({
+        user: users,
+        passwordHash: credentials.passwordHash,
+      })
+      .from(users)
+      .innerJoin(credentials, eq(credentials.userId, users.id))
+      .where(eq(users.email, email))
+      .limit(1)
+
+    return result[0] ?? null
   },
 }

@@ -51,7 +51,36 @@ describe('userRepository', () => {
   it('throws UsernameTaken when username already exists', async () => {
     const accountA = build()
     const accountB = build()
+    describe('findByEmail', () => {
+      it('returns the user and passwordHash for an existing email', async () => {
+        const account = build()
 
+        await userRepository.createAccount(account)
+
+        const result = await userRepository.findByEmail(account.user.email)
+
+        expect(result).not.toBeNull()
+        expect(result?.user.id).toBe(account.user.id)
+        expect(result?.passwordHash).toBe(account.passwordHash)
+      })
+
+      it('finds a user using an uppercase email', async () => {
+        const account = build()
+
+        await userRepository.createAccount(account)
+
+        const result = await userRepository.findByEmail(account.user.email.toUpperCase())
+
+        expect(result).not.toBeNull()
+        expect(result?.user.id).toBe(account.user.id)
+      })
+
+      it('returns null for an unknown email', async () => {
+        const result = await userRepository.findByEmail('unknown@example.com')
+
+        expect(result).toBeNull()
+      })
+    })
     accountB.user.username = accountA.user.username
 
     await userRepository.createAccount(accountA)
@@ -72,5 +101,36 @@ describe('userRepository', () => {
     const userRows = await db.select().from(users).where(eq(users.id, accountB.user.id))
 
     expect(userRows).toHaveLength(0)
+  })
+})
+
+describe('findByEmail', () => {
+  it('returns the user and passwordHash for an existing email', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await userRepository.findByEmail(account.user.email)
+
+    expect(result).not.toBeNull()
+    expect(result?.user.id).toBe(account.user.id)
+    expect(result?.passwordHash).toBe(account.passwordHash)
+  })
+
+  it('finds a user using an uppercase email', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await userRepository.findByEmail(account.user.email.toUpperCase())
+
+    expect(result).not.toBeNull()
+    expect(result?.user.id).toBe(account.user.id)
+  })
+
+  it('returns null for an unknown email', async () => {
+    const result = await userRepository.findByEmail('unknown@example.com')
+
+    expect(result).toBeNull()
   })
 })

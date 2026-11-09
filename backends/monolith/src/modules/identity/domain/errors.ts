@@ -20,3 +20,10 @@ export class ValidationFailed extends Error {
     this.name = 'ValidationFailed'
   }
 }
+
+export class InvalidCredentials extends Error {
+  constructor() {
+    super('Email or password is incorrect')
+    this.name = 'InvalidCredentials'
+  }
+}
