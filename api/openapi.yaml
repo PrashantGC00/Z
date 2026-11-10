@@ -167,7 +167,7 @@ paths:
       operationId: login
       summary: Sign in with email and password
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -180,6 +180,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AuthSession" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
   /auth/refresh:
     post:
@@ -205,6 +206,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /auth/logout:
     post:
       tags: [Auth]
@@ -222,6 +224,7 @@ paths:
                 refreshToken: { type: string }
       responses:
         "204": { description: Signed out. }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
 
   # ───────────────────────────── Users ─────────────────────────────
   /users/me:
