@@ -1,3 +1,6 @@
+export const MAX_PASSWORD_LENGTH = 128
+export const MIN_PASSWORD_LENGTH = 10
+
 export type Invalid = {
   field: string
   message: string
@@ -32,12 +35,12 @@ export function normalizeDisplayName(name: string): string {
 }
 
 export function validatePassword(pw: string): Invalid | null {
-  if (pw.length < 10) {
-    return { field: 'password', message: 'must be at least 10 characters' }
+  if (pw.length < MIN_PASSWORD_LENGTH) {
+    return { field: 'password', message: `must be at least ${MIN_PASSWORD_LENGTH} characters` }
   }
 
-  if (pw.length > 128) {
-    return { field: 'password', message: 'must be at most 128 characters' }
+  if (pw.length > MAX_PASSWORD_LENGTH) {
+    return { field: 'password', message: `must be at most ${MAX_PASSWORD_LENGTH} characters` }
   }
 
   return null
