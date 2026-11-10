@@ -19,9 +19,7 @@ export const toMe = (u: User) => ({
 })
 
 export function toProblem(err: unknown): unknown {
-  if (err instanceof ValidationFailed) {
-    return new ProblemError(422, 'Validation failed', undefined, err.errors)
-  }
+  if (err instanceof ValidationFailed) return new ProblemError(422, 'Validation failed', undefined, err.errors)
   if (err instanceof EmailTaken) return new ProblemError(409, 'Conflict', err.message)
   if (err instanceof UsernameTaken) return new ProblemError(409, 'Conflict', err.message)
   if (err instanceof InvalidCredentials) return new ProblemError(401, 'Unauthorized', err.message)
