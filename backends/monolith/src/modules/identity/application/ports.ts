@@ -30,3 +30,7 @@ export interface UserRepository {
 export interface RefreshTokenRepository {
   create(token: NewRefreshToken): Promise<void>
 }
+
+export interface AccessTokenVerifier {
+  verify(token: string): Promise<{ userId: string } | null>
+}
