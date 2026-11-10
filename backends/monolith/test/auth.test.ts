@@ -19,6 +19,7 @@ const validBody = (overrides: Record<string, unknown> = {}) => {
 }
 
 const register = (body: object) => request(app).post('/v1/auth/register').send(body)
+const login = (body: object) => request(app).post('/v1/auth/login').send(body)
 
 describe('POST /v1/auth/register', () => {
   it('201: returns the user and tokens', async () => {
@@ -79,5 +80,129 @@ describe('POST /v1/auth/register', () => {
 
     expect(res.status).toBe(422)
     expect(JSON.stringify(res.body)).toContain('displayName')
+  })
+})
+
+describe('POST /v1/auth/login', () => {
+  it('200: with valid credentials', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const loginBody = {
+      email: body.email,
+      password: body.password,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(200)
+    expect(session.body.user.email).toBe(body.email)
+    expect(session.body.user.relationship).toBeNull()
+    expect(typeof session.body.tokens.accessToken).toBe('string')
+    expect(typeof session.body.tokens.refreshToken).toBe('string')
+    expect(typeof session.body.tokens.expiresIn).toBe('number')
+  })
+
+  it('doesnt leak secrets', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const loginBody = {
+      email: body.email,
+      password: body.password,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(200)
+    const serialised = JSON.stringify(session.body)
+    expect(serialised).not.toContain('argon2')
+    expect(serialised).not.toContain(PASSWORD)
+  })
+
+  it('401: wrong password', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const loginBody = {
+      email: body.email,
+      password: body.password + 1,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(401)
+    expect(session.headers['content-type']).toMatch(/^application\/problem\+json/)
+  })
+
+  it('401: unknown email', async () => {
+    const loginBody = {
+      email: 'user_test@test.com',
+      password: validBody().password,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(401)
+    expect(session.headers['content-type']).toMatch(/^application\/problem\+json/)
+  })
+
+  it('401: returns the same error for wrong password and unknown email', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const wrongPassword = await login({
+      email: body.email,
+      password: body.password + 1,
+    })
+
+    const unknownEmail = await login({
+      email: 'user_test@test.com',
+      password: body.password,
+    })
+
+    expect(wrongPassword.status).toBe(401)
+    expect(unknownEmail.status).toBe(401)
+
+    expect(wrongPassword.headers['content-type']).toMatch(/^application\/problem\+json/)
+    expect(unknownEmail.headers['content-type']).toMatch(/^application\/problem\+json/)
+
+    expect({
+      status: wrongPassword.status,
+      title: wrongPassword.body.title,
+      detail: wrongPassword.body.detail,
+    }).toEqual({
+      status: unknownEmail.status,
+      title: unknownEmail.body.title,
+      detail: unknownEmail.body.detail,
+    })
+  })
+
+  it('200: login with uppercase email', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const loginBody = {
+      email: body.email.toUpperCase(),
+      password: body.password,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(200)
+  })
+
+  it('422: missing password', async () => {
+    const body = validBody()
+    const res = await register(body)
+    expect(res.status).toBe(201)
+
+    const loginBody = {
+      email: body.email,
+    }
+
+    const session = await login(loginBody)
+    expect(session.status).toBe(422)
+    expect(session.headers['content-type']).toMatch(/^application\/problem\+json/)
   })
 })
