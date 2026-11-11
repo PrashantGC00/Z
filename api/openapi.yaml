@@ -213,7 +213,7 @@ paths:
       operationId: logout
       summary: Revoke the current refresh token
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
