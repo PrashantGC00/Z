@@ -90,3 +90,75 @@ describe('refreshTokenRepository', () => {
     )
   })
 })
+
+describe('claim', () => {
+  it('returns userId and familyId for a fresh token', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date()
+
+    const result = await refreshTokenRepository.claim(account.refreshToken.tokenHash, now)
+
+    expect(result).toEqual({
+      userId: account.user.id,
+      familyId: account.refreshToken.familyId,
+    })
+  })
+
+  it('returns null when claiming the same token twice', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date()
+
+    const first = await refreshTokenRepository.claim(account.refreshToken.tokenHash, now)
+
+    const second = await refreshTokenRepository.claim(account.refreshToken.tokenHash, now)
+
+    expect(first).not.toBeNull()
+    expect(second).toBeNull()
+  })
+
+  it('returns null for an expired token', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date(Date.now() + 120_000)
+
+    const result = await refreshTokenRepository.claim(account.refreshToken.tokenHash, now)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null for an unknown token hash', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await refreshTokenRepository.claim(Buffer.from('unknown-token-hash'), new Date())
+
+    expect(result).toBeNull()
+  })
+
+  it('allows exactly one claim when two requests race', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date()
+    const tokenHash = account.refreshToken.tokenHash
+
+    const results = await Promise.all([
+      refreshTokenRepository.claim(tokenHash, now),
+      refreshTokenRepository.claim(tokenHash, now),
+    ])
+
+    const successfulClaims = results.filter((result) => result !== null)
+
+    expect(successfulClaims).toHaveLength(1)
+  })
+})

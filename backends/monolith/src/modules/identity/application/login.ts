@@ -10,7 +10,7 @@ import type {
 
 export type LoginDeps = {
   users: Pick<UserRepository, 'findByEmail'>
-  tokenStore: RefreshTokenRepository
+  tokenStore: Pick<RefreshTokenRepository, 'create'>
   hasher: PasswordHasher
   accessTokens: AccessTokenIssuer
   refreshTokens: RefreshTokenGenerator
