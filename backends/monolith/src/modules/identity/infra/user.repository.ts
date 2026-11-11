@@ -37,4 +37,10 @@ export const userRepository: UserRepository = {
 
     return result[0] ?? null
   },
+
+  async findById(userId) {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+
+    return user ?? null
+  },
 }

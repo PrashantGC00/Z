@@ -88,3 +88,34 @@ describe('findByEmail', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('findById', () => {
+  it('returns the user with the correct id and email', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await userRepository.findById(account.user.id)
+
+    expect(result).not.toBeNull()
+    expect(result?.id).toBe(account.user.id)
+    expect(result?.email).toBe(account.user.email)
+  })
+
+  it('does not expose passwordHash', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await userRepository.findById(account.user.id)
+
+    expect(result).not.toBeNull()
+    expect(result).not.toHaveProperty('passwordHash')
+  })
+
+  it('returns null for an unknown id', async () => {
+    const result = await userRepository.findById(build().user.id)
+
+    expect(result).toBeNull()
+  })
+})
