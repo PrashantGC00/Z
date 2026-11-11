@@ -20,6 +20,7 @@ const validBody = (overrides: Record<string, unknown> = {}) => {
 
 const register = (body: object) => request(app).post('/v1/auth/register').send(body)
 const login = (body: object) => request(app).post('/v1/auth/login').send(body)
+const refresh = (token: string) => request(app).post('/v1/auth/refresh').send({ refreshToken: token })
 
 describe('POST /v1/auth/register', () => {
   it('201: returns the user and tokens', async () => {
@@ -204,5 +205,97 @@ describe('POST /v1/auth/login', () => {
     const session = await login(loginBody)
     expect(session.status).toBe(422)
     expect(session.headers['content-type']).toMatch(/^application\/problem\+json/)
+  })
+})
+
+describe('POST /v1/auth/refresh', () => {
+  it('rotates a refresh token', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const response = await refresh(tokenA)
+
+    expect(response.status).toBe(200)
+    expect(response.body.refreshToken).toBeTruthy()
+    expect(response.body.refreshToken).not.toBe(tokenA)
+    expect(response.body.accessToken).toBeTruthy()
+  })
+
+  it('allows access to the authenticated user with the new access token', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const rotation = await refresh(tokenA)
+    const accessToken = rotation.body.accessToken
+
+    const response = await request(app).get('/v1/users/me').set('Authorization', `Bearer ${accessToken}`)
+
+    expect(response.status).toBe(200)
+    expect(response.body.id).toBe(registration.body.user.id)
+  })
+
+  it('rejects a replayed refresh token', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const rotation = await refresh(tokenA)
+    expect(rotation.status).toBe(200)
+
+    const replay = await refresh(tokenA)
+
+    expect(replay.status).toBe(401)
+  })
+
+  it('rejects the rotated token after its previous token has been replayed', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const rotation = await refresh(tokenA)
+    const tokenB = rotation.body.refreshToken
+
+    const replay = await refresh(tokenA)
+    expect(replay.status).toBe(401)
+
+    const response = await refresh(tokenB)
+
+    expect(response.status).toBe(401)
+  })
+
+  it('preserves other sessions when a token family is revoked', async () => {
+    const body = validBody()
+
+    const registration = await register(body)
+    const tokenA = registration.body.tokens.refreshToken
+
+    const loginResponse = await request(app).post('/v1/auth/login').send(body)
+
+    expect(loginResponse.status).toBe(200)
+
+    const tokenB = loginResponse.body.tokens.refreshToken
+
+    const rotation = await refresh(tokenA)
+    expect(rotation.status).toBe(200)
+
+    const replay = await refresh(tokenA)
+    expect(replay.status).toBe(401)
+
+    const otherSession = await refresh(tokenB)
+
+    expect(otherSession.status).toBe(200)
+    expect(otherSession.body.refreshToken).toBeTruthy()
+    expect(otherSession.body.refreshToken).not.toBe(tokenB)
+  })
+
+  it('rejects an unknown refresh token', async () => {
+    const response = await refresh('unknown-refresh-token')
+
+    expect(response.status).toBe(401)
+    expect(response.headers['content-type']).toMatch(/application\/problem\+json/)
+  })
+
+  it('rejects an invalid request body', async () => {
+    const response = await request(app).post('/v1/auth/refresh').send({ refreshToken: 123 })
+
+    expect(response.status).toBe(422)
   })
 })
