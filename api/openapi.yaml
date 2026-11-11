@@ -189,7 +189,7 @@ paths:
       summary: Rotate the refresh token
       description: Refresh tokens are single use. Presenting a used token revokes the whole token family (reuse detection).
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
