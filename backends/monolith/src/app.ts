@@ -1,12 +1,12 @@
 import express, { type Application } from 'express'
 import cors from 'cors'
-import { validateRequests } from './platform/http/validate.ts'
+import { makeValidateRequests } from './platform/http/validate.ts'
 import { ProblemError, problemHandler } from './platform/http/problem.ts'
 import { healthRouter } from './platform/health.ts'
 import { requestContextMiddleware, requestLogger } from './platform/logger.ts'
 import { config } from './platform/config.ts'
 import helmet from 'helmet'
-import { identityRouter, userRouter } from './modules/identity/index.ts'
+import { bearerAuth, identityRouter, userRouter } from './modules/identity/index.ts'
 
 const app: Application = express()
 
@@ -32,7 +32,7 @@ app.use(express.json())
 
 app.use(healthRouter)
 
-app.use(validateRequests)
+app.use(makeValidateRequests({ bearerAuth }))
 
 app.use('/v1', identityRouter)
 app.use('/v1', userRouter)

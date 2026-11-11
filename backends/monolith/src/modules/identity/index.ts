@@ -1,10 +1,10 @@
-import type { RequestHandler } from 'express'
+import type { Request, RequestHandler } from 'express'
 import { config } from '../../platform/config.ts'
 import { newId } from '../../platform/ids.ts'
 import { makeLogin } from './application/login.ts'
 import { makeRegister } from './application/register.ts'
 import { makeAuthRouter } from './http/auth.router.ts'
-import { makeRequireAuth } from './http/require-auth.ts'
+import { makeAuthenticate, makeRequireAuth } from './http/require-auth.ts'
 import { jwtTokenIssuer } from './infra/jwt-issuer.ts'
 import { jwtTokenVerifier } from './infra/jwt-verifier.ts'
 import { argonPasswordHasher } from './infra/password-hasher.ts'
@@ -15,6 +15,7 @@ import { makeGetMe } from './application/get-me.ts'
 import { makeUserRouter } from './http/users.router.ts'
 import { makeRefreshToken } from './application/refresh-tokens.ts'
 import { makeLogout } from './application/logout.ts'
+import { makeUpdateMe } from './application/update-me.ts'
 
 const register = makeRegister({
   users: userRepository,
@@ -51,9 +52,18 @@ const logout = makeLogout({
   refreshTokens: refreshTokenGenerator,
   now: () => new Date(),
 })
+
 const getMe = makeGetMe({ users: userRepository })
+const updateMe = makeUpdateMe({ users: userRepository, now: () => new Date() })
 
 export const requireAuth: RequestHandler = makeRequireAuth(jwtTokenVerifier)
+const authenticate = makeAuthenticate(jwtTokenVerifier)
+export const bearerAuth = async (req: Request): Promise<boolean> => {
+  const auth = await authenticate(req.headers.authorization)
+  if (!auth) return false
+  req.auth = auth
+  return true
+}
 
 export const identityRouter = makeAuthRouter({ register, login, refreshTokens, logout })
-export const userRouter = makeUserRouter({ getMe, requireAuth })
+export const userRouter = makeUserRouter({ getMe, requireAuth, updateMe })

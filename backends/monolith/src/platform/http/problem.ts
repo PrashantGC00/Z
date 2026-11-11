@@ -14,6 +14,8 @@ export type ProblemDetails = {
   errors?: Array<{ field: string; message: string }> | undefined
 }
 
+export const UNAUTHORIZED_DETAIL = 'Missing or invalid access token'
+
 export class ProblemError extends Error {
   readonly type = 'about:blank'
 
@@ -91,6 +93,7 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
     type: 'about:blank',
     title: STATUS_CODES[status] ?? 'Error',
     status,
+    ...(status === 401 && { detail: UNAUTHORIZED_DETAIL }),
     ...base,
   })
 }
