@@ -1,5 +1,12 @@
 import { ProblemError } from '../../../platform/http/problem.ts'
-import { EmailTaken, InvalidCredentials, NotAuthorized, UsernameTaken, ValidationFailed } from '../domain/errors.ts'
+import {
+  EmailTaken,
+  InvalidCredentials,
+  InvalidRefreshToken,
+  NotAuthorized,
+  UsernameTaken,
+  ValidationFailed,
+} from '../domain/errors.ts'
 import type { User } from '../domain/user.ts'
 
 export const toMe = (u: User) => ({
@@ -24,5 +31,6 @@ export function toProblem(err: unknown): unknown {
   if (err instanceof UsernameTaken) return new ProblemError(409, 'Conflict', err.message)
   if (err instanceof InvalidCredentials) return new ProblemError(401, 'Unauthorized', err.message)
   if (err instanceof NotAuthorized) return new ProblemError(401, 'Unauthorized', err.message)
+  if (err instanceof InvalidRefreshToken) return new ProblemError(401, 'Unauthorized', err.message)
   return err
 }

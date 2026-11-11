@@ -34,3 +34,10 @@ export class NotAuthorized extends Error {
     this.name = 'NotAuthorized'
   }
 }
+
+export class InvalidRefreshToken extends Error {
+  constructor() {
+    super('Invalid refresh token')
+    this.name = 'InvalidRefreshToken'
+  }
+}
