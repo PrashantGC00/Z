@@ -14,6 +14,7 @@ import { userRepository } from './infra/user.repository.ts'
 import { makeGetMe } from './application/get-me.ts'
 import { makeUserRouter } from './http/users.router.ts'
 import { makeRefreshToken } from './application/refresh-tokens.ts'
+import { makeLogout } from './application/logout.ts'
 
 const register = makeRegister({
   users: userRepository,
@@ -45,9 +46,14 @@ const refreshTokens = makeRefreshToken({
   refreshTtlSeconds: config.REFRESH_TOKEN_TTL_SECONDS,
 })
 
+const logout = makeLogout({
+  tokenStore: refreshTokenRepository,
+  refreshTokens: refreshTokenGenerator,
+  now: () => new Date(),
+})
 const getMe = makeGetMe({ users: userRepository })
 
 export const requireAuth: RequestHandler = makeRequireAuth(jwtTokenVerifier)
 
-export const identityRouter = makeAuthRouter({ register, login, refreshTokens })
+export const identityRouter = makeAuthRouter({ register, login, refreshTokens, logout })
 export const userRouter = makeUserRouter({ getMe, requireAuth })

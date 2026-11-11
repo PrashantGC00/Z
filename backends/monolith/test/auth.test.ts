@@ -21,6 +21,7 @@ const validBody = (overrides: Record<string, unknown> = {}) => {
 const register = (body: object) => request(app).post('/v1/auth/register').send(body)
 const login = (body: object) => request(app).post('/v1/auth/login').send(body)
 const refresh = (token: string) => request(app).post('/v1/auth/refresh').send({ refreshToken: token })
+const logout = (token: string) => request(app).post('/v1/auth/logout').send({ refreshToken: token })
 
 describe('POST /v1/auth/register', () => {
   it('201: returns the user and tokens', async () => {
@@ -295,6 +296,101 @@ describe('POST /v1/auth/refresh', () => {
 
   it('rejects an invalid request body', async () => {
     const response = await request(app).post('/v1/auth/refresh').send({ refreshToken: 123 })
+
+    expect(response.status).toBe(422)
+  })
+})
+
+describe('POST /v1/auth/logout', () => {
+  it('logs out and returns an empty response', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const response = await logout(tokenA)
+
+    expect(response.status).toBe(204)
+    expect(response.text).toBe('')
+  })
+
+  it('rejects refresh after logout', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const response = await logout(tokenA)
+    expect(response.status).toBe(204)
+
+    const refreshResponse = await refresh(tokenA)
+
+    expect(refreshResponse.status).toBe(401)
+  })
+
+  it('revokes the entire token family, including newer tokens', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const rotationB = await refresh(tokenA)
+    expect(rotationB.status).toBe(200)
+
+    const tokenB = rotationB.body.refreshToken
+
+    const rotationC = await refresh(tokenB)
+    expect(rotationC.status).toBe(200)
+
+    const tokenC = rotationC.body.refreshToken
+
+    const logoutResponse = await logout(tokenB)
+    expect(logoutResponse.status).toBe(204)
+
+    const refreshResponse = await refresh(tokenC)
+
+    expect(refreshResponse.status).toBe(401)
+  })
+
+  it('succeeds when logging out with an unknown token', async () => {
+    const response = await logout('unknown-refresh-token')
+
+    expect(response.status).toBe(204)
+    expect(response.text).toBe('')
+  })
+
+  it('allows logging out with the same token twice', async () => {
+    const registration = await register(validBody())
+    const tokenA = registration.body.tokens.refreshToken
+
+    const firstLogout = await logout(tokenA)
+    const secondLogout = await logout(tokenA)
+
+    expect(firstLogout.status).toBe(204)
+    expect(secondLogout.status).toBe(204)
+    expect(firstLogout.text).toBe('')
+    expect(secondLogout.text).toBe('')
+  })
+
+  it('preserves other sessions when logging out', async () => {
+    const body = validBody()
+
+    const registration = await register(body)
+    const tokenX = registration.body.tokens.refreshToken
+
+    const loginResponse = await request(app).post('/v1/auth/login').send(body)
+
+    expect(loginResponse.status).toBe(200)
+
+    const tokenY = loginResponse.body.tokens.refreshToken
+
+    const logoutResponse = await logout(tokenX)
+
+    expect(logoutResponse.status).toBe(204)
+
+    const otherSession = await refresh(tokenY)
+
+    expect(otherSession.status).toBe(200)
+    expect(otherSession.body.refreshToken).toBeTruthy()
+    expect(otherSession.body.refreshToken).not.toBe(tokenY)
+  })
+
+  it('rejects an empty request body', async () => {
+    const response = await request(app).post('/v1/auth/logout').send({})
 
     expect(response.status).toBe(422)
   })
