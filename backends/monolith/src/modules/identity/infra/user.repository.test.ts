@@ -119,3 +119,65 @@ describe('findById', () => {
     expect(result).toBeNull()
   })
 })
+
+describe('updateProfile', () => {
+  it('updates displayName and returns the updated user', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date()
+    const result = await userRepository.updateProfile(account.user.id, { displayName: 'New' }, now)
+
+    expect(result?.displayName).toBe('New')
+  })
+
+  it('preserves fields missing from the patch', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    await userRepository.updateProfile(account.user.id, { bio: 'hi' }, new Date())
+
+    const result = await userRepository.updateProfile(account.user.id, { displayName: 'X' }, new Date())
+
+    expect(result?.bio).toBe('hi')
+  })
+
+  it('clears nullable fields when set to null', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    await userRepository.updateProfile(account.user.id, { bio: 'hi' }, new Date())
+
+    const result = await userRepository.updateProfile(account.user.id, { bio: null }, new Date())
+
+    expect(result?.bio).toBeNull()
+  })
+
+  it('updates updatedAt to the given date', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const now = new Date('2026-11-11T10:00:00.000Z')
+    const result = await userRepository.updateProfile(account.user.id, { displayName: 'New' }, now)
+
+    expect(result?.updatedAt).toEqual(now)
+  })
+
+  it('returns null for an unknown user id', async () => {
+    const result = await userRepository.updateProfile(build().user.id, { displayName: 'New' }, new Date())
+
+    expect(result).toBeNull()
+  })
+
+  it('rejects bio exceeding 300 characters', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    await expect(userRepository.updateProfile(account.user.id, { bio: 'a'.repeat(301) }, new Date())).rejects.toThrow()
+  })
+})

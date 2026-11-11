@@ -2,6 +2,13 @@ import type { User } from '../domain/user.ts'
 
 export type NewRefreshToken = NewAccount['refreshToken'] & { userId: string }
 
+export type ProfilePatch = Partial<{
+  displayName: string
+  bio: string | null
+  location: string | null
+  website: string | null
+}>
+
 export interface PasswordHasher {
   hash(password: string): Promise<string>
   verify(encoded: string | null, password: string): Promise<boolean>
@@ -26,6 +33,7 @@ export interface UserRepository {
   createAccount(account: NewAccount): Promise<User>
   findByEmail(email: string): Promise<{ user: User; passwordHash: string } | null>
   findById(userId: string): Promise<User | null>
+  updateProfile(userId: string, patch: ProfilePatch, now: Date): Promise<User | null>
 }
 
 export interface RefreshTokenRepository {

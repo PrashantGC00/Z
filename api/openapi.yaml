@@ -257,6 +257,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /users/{username}:
     parameters: [{ $ref: "#/components/parameters/Username" }]

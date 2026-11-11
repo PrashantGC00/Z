@@ -43,4 +43,13 @@ export const userRepository: UserRepository = {
 
     return user ?? null
   },
+
+  async updateProfile(userId, patch, now) {
+    const [user] = await db
+      .update(users)
+      .set({ ...patch, updatedAt: now })
+      .where(eq(users.id, userId))
+      .returning()
+    return user ?? null
+  },
 }

@@ -76,3 +76,55 @@ export function validateUsername(u: string): Invalid | null {
 
   return null
 }
+
+export function normalizeBio(bio: string | null): string | null {
+  const normalized = bio?.trim() ?? ''
+
+  return normalized.length === 0 ? null : normalized
+}
+
+export function validateBio(bio: string | null): Invalid | null {
+  if (bio !== null && bio.length > 300) {
+    return { field: 'bio', message: 'must be at most 300 characters' }
+  }
+
+  return null
+}
+
+export function normalizeLocation(location: string | null): string | null {
+  const normalized = location?.trim() ?? ''
+
+  return normalized.length === 0 ? null : normalized
+}
+
+export function validateLocation(location: string | null): Invalid | null {
+  if (location !== null && location.length > 60) {
+    return { field: 'location', message: 'must be at most 60 characters' }
+  }
+
+  return null
+}
+
+export function normalizeWebsite(website: string | null): string | null {
+  const normalized = website?.trim() ?? ''
+
+  return normalized.length === 0 ? null : normalized
+}
+
+export function validateWebsite(website: string | null): Invalid | null {
+  if (website === null) {
+    return null
+  }
+
+  try {
+    const url = new URL(website)
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { field: 'website', message: 'must use http or https' }
+    }
+  } catch {
+    return { field: 'website', message: 'must be a valid URL' }
+  }
+
+  return null
+}
