@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { InvalidCredentials } from '../domain/errors.ts'
-import { MAX_PASSWORD_LENGTH, type User } from '../domain/user.ts'
+import { MAX_PASSWORD_LENGTH } from '../domain/user.ts'
 import type {
   AccessTokenIssuer,
   PasswordHasher,
@@ -9,29 +9,11 @@ import type {
   UserRepository,
 } from './ports.ts'
 import { makeLogin } from './login.ts'
+import { NOW, someUser } from '../../../../test/helpers.ts'
 
-const NOW = new Date('2026-01-01T00:00:00.000Z')
 const TTL = 60 * 60 * 24 * 30
 const RAW_PASSWORD = 'testtest'
 const RAW_TOKEN = 'thisistoken123'
-
-const someUser: User = {
-  id: 'user-1',
-  email: 'ada@x.com',
-  username: 'ada',
-  displayName: 'Ada',
-  bio: null,
-  location: null,
-  website: null,
-  avatarMediaId: null,
-  coverMediaId: null,
-  verified: false,
-  postsCount: 0,
-  followersCount: 0,
-  followingCount: 0,
-  createdAt: NOW,
-  updatedAt: NOW,
-}
 
 const validInput = {
   email: 'ada@x.com',

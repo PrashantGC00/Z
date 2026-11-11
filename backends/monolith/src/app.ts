@@ -6,7 +6,7 @@ import { healthRouter } from './platform/health.ts'
 import { requestContextMiddleware, requestLogger } from './platform/logger.ts'
 import { config } from './platform/config.ts'
 import helmet from 'helmet'
-import { identityRouter } from './modules/identity/index.ts'
+import { identityRouter, userRouter } from './modules/identity/index.ts'
 
 const app: Application = express()
 
@@ -35,6 +35,7 @@ app.use(healthRouter)
 app.use(validateRequests)
 
 app.use('/v1', identityRouter)
+app.use('/v1', userRouter)
 
 app.use((_req, _res, next) => next(new ProblemError(404, 'Not Found')))
 

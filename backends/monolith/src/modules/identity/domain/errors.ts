@@ -27,3 +27,10 @@ export class InvalidCredentials extends Error {
     this.name = 'InvalidCredentials'
   }
 }
+
+export class NotAuthorized extends Error {
+  constructor() {
+    super('Missing or invalid access token')
+    this.name = 'NotAuthorized'
+  }
+}

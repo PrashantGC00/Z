@@ -11,6 +11,8 @@ import { argonPasswordHasher } from './infra/password-hasher.ts'
 import { refreshTokenGenerator } from './infra/refresh-token-generator.ts'
 import { refreshTokenRepository } from './infra/refresh-token.repository.ts'
 import { userRepository } from './infra/user.repository.ts'
+import { makeGetMe } from './application/get-me.ts'
+import { makeUserRouter } from './http/users.router.ts'
 
 const register = makeRegister({
   users: userRepository,
@@ -33,6 +35,9 @@ const login = makeLogin({
   refreshTtlSeconds: config.REFRESH_TOKEN_TTL_SECONDS,
 })
 
+const getMe = makeGetMe({ users: userRepository })
+
 export const requireAuth: RequestHandler = makeRequireAuth(jwtTokenVerifier)
 
 export const identityRouter = makeAuthRouter({ register, login })
+export const userRouter = makeUserRouter({ getMe, requireAuth })
