@@ -232,7 +232,7 @@ paths:
       tags: [Users]
       operationId: getMe
       summary: Get the signed-in user
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       responses:
         "200":
           description: The signed-in user.
