@@ -27,4 +27,20 @@ export const refreshTokenRepository: RefreshTokenRepository = {
 
     return result ?? null
   },
+
+  async findByHash(tokenHash) {
+    const [result] = await db
+      .select({ familyId: refreshTokens.familyId, usedAt: refreshTokens.usedAt, revokedAt: refreshTokens.revokedAt })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.tokenHash, tokenHash))
+      .limit(1)
+    return result ?? null
+  },
+
+  async revokeFamily(familyId, now) {
+    await db
+      .update(refreshTokens)
+      .set({ revokedAt: now })
+      .where(and(eq(refreshTokens.familyId, familyId), isNull(refreshTokens.revokedAt)))
+  },
 }

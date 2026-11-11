@@ -162,3 +162,113 @@ describe('claim', () => {
     expect(successfulClaims).toHaveLength(1)
   })
 })
+
+describe('findByHash', () => {
+  it('returns a fresh token with matching familyId', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
+
+    expect(result).not.toBeNull()
+    expect(result?.familyId).toBe(account.refreshToken.familyId)
+    expect(result?.usedAt).toBeNull()
+    expect(result?.revokedAt).toBeNull()
+  })
+
+  it('returns usedAt after the token has been claimed', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    await refreshTokenRepository.claim(account.refreshToken.tokenHash, new Date())
+
+    const result = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
+
+    expect(result?.usedAt).toBeInstanceOf(Date)
+  })
+
+  it('returns null for an unknown token hash', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await refreshTokenRepository.findByHash(Buffer.alloc(32, 1))
+
+    expect(result).toBeNull()
+  })
+})
+
+describe('revokeFamily', () => {
+  it('revokes all tokens belonging to a family', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const secondToken = refreshTokenGenerator.generate()
+    const otherFamilyToken = refreshTokenGenerator.generate()
+
+    const second = {
+      id: newId(),
+      familyId: account.refreshToken.familyId,
+      tokenHash: secondToken.tokenHash,
+      expiresAt: new Date(Date.now() + 60_000),
+      userId: account.user.id,
+    }
+
+    const otherFamily = {
+      id: newId(),
+      familyId: newId(),
+      tokenHash: otherFamilyToken.tokenHash,
+      expiresAt: new Date(Date.now() + 60_000),
+      userId: account.user.id,
+    }
+
+    await refreshTokenRepository.create(second)
+    await refreshTokenRepository.create(otherFamily)
+
+    const now = new Date()
+
+    await refreshTokenRepository.revokeFamily(account.refreshToken.familyId, now)
+
+    const firstResult = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
+
+    const secondResult = await refreshTokenRepository.findByHash(second.tokenHash)
+
+    const otherFamilyResult = await refreshTokenRepository.findByHash(otherFamily.tokenHash)
+
+    expect(firstResult?.revokedAt).toEqual(now)
+    expect(secondResult?.revokedAt).toEqual(now)
+    expect(otherFamilyResult?.revokedAt).toBeNull()
+  })
+
+  it('does not allow claiming a revoked token', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    await refreshTokenRepository.revokeFamily(account.refreshToken.familyId, new Date())
+
+    const result = await refreshTokenRepository.claim(account.refreshToken.tokenHash, new Date())
+
+    expect(result).toBeNull()
+  })
+
+  it('does not overwrite the original revokedAt when revoking twice', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const firstNow = new Date()
+    const secondNow = new Date(firstNow.getTime() + 60_000)
+
+    await refreshTokenRepository.revokeFamily(account.refreshToken.familyId, firstNow)
+
+    await refreshTokenRepository.revokeFamily(account.refreshToken.familyId, secondNow)
+
+    const result = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
+
+    expect(result?.revokedAt).toEqual(firstNow)
+  })
+})

@@ -31,6 +31,8 @@ export interface UserRepository {
 export interface RefreshTokenRepository {
   create(token: NewRefreshToken): Promise<void>
   claim(tokenHash: Buffer, now: Date): Promise<{ userId: string; familyId: string } | null>
+  findByHash(tokenHash: Buffer): Promise<{ familyId: string; usedAt: Date | null; revokedAt: Date | null } | null>
+  revokeFamily(familyId: string, now: Date): Promise<void>
 }
 
 export interface AccessTokenVerifier {
