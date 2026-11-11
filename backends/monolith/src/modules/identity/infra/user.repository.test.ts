@@ -181,3 +181,23 @@ describe('updateProfile', () => {
     await expect(userRepository.updateProfile(account.user.id, { bio: 'a'.repeat(301) }, new Date())).rejects.toThrow()
   })
 })
+
+describe('findByUsername', () => {
+  it('returns the user for an existing username', async () => {
+    const account = build()
+
+    await userRepository.createAccount(account)
+
+    const result = await userRepository.findByUsername(account.user.username)
+
+    expect(result).not.toBeNull()
+    expect(result?.id).toBe(account.user.id)
+    expect(result?.username).toBe(account.user.username)
+  })
+
+  it('returns null for an unknown username', async () => {
+    const result = await userRepository.findByUsername('unknown_user')
+
+    expect(result).toBeNull()
+  })
+})

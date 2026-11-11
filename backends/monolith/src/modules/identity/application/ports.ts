@@ -34,6 +34,7 @@ export interface UserRepository {
   findByEmail(email: string): Promise<{ user: User; passwordHash: string } | null>
   findById(userId: string): Promise<User | null>
   updateProfile(userId: string, patch: ProfilePatch, now: Date): Promise<User | null>
+  findByUsername(username: string): Promise<User | null>
 }
 
 export interface RefreshTokenRepository {

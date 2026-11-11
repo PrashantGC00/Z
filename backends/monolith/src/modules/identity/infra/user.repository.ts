@@ -52,4 +52,9 @@ export const userRepository: UserRepository = {
       .returning()
     return user ?? null
   },
+
+  async findByUsername(username) {
+    const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1)
+    return user ?? null
+  },
 }

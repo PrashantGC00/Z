@@ -1,17 +1,18 @@
 import { ProblemError } from '../../../platform/http/problem.ts'
+import type { Relationship } from '../application/get-user-profile.ts'
 import {
   EmailTaken,
   InvalidCredentials,
   InvalidRefreshToken,
   NotAuthorized,
   UsernameTaken,
+  UserNotFound,
   ValidationFailed,
 } from '../domain/errors.ts'
 import type { User } from '../domain/user.ts'
 
-export const toMe = (u: User) => ({
+export const toProfile = (u: User, relationship: Relationship | null) => ({
   id: u.id,
-  email: u.email,
   username: u.username,
   displayName: u.displayName,
   verified: u.verified,
@@ -22,7 +23,12 @@ export const toMe = (u: User) => ({
   coverUrl: null,
   createdAt: u.createdAt.toISOString(),
   stats: { posts: u.postsCount, followers: u.followersCount, following: u.followingCount },
-  relationship: null,
+  relationship,
+})
+
+export const toMe = (u: User) => ({
+  ...toProfile(u, null),
+  email: u.email,
 })
 
 export function toProblem(err: unknown): unknown {
@@ -32,5 +38,6 @@ export function toProblem(err: unknown): unknown {
   if (err instanceof InvalidCredentials) return new ProblemError(401, 'Unauthorized', err.message)
   if (err instanceof NotAuthorized) return new ProblemError(401, 'Unauthorized', err.message)
   if (err instanceof InvalidRefreshToken) return new ProblemError(401, 'Unauthorized', err.message)
+  if (err instanceof UserNotFound) return new ProblemError(404, 'Not Found')
   return err
 }

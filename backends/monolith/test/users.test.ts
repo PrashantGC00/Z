@@ -29,6 +29,18 @@ const patchMe = (token: string | undefined, body: object) => {
   if (token) req.set('Authorization', `Bearer ${token}`)
   return req
 }
+const getProfile = (username: string, token?: string) => {
+  const req = request(app).get(`/v1/users/${username}`)
+  if (token) req.set('Authorization', `Bearer ${token}`)
+  return req
+}
+const signUp = async () => {
+  const res = await register(validBody())
+  return {
+    user: res.body.user,
+    token: res.body.tokens.accessToken,
+  }
+}
 
 const getMe = (token?: string) => {
   const req = request(app).get('/v1/users/me')
@@ -95,6 +107,15 @@ describe('GET /v1/users/me', () => {
       title: invalidToken.body.title,
       detail: invalidToken.body.detail,
     })
+  })
+
+  it('still returns the authenticated user with email', async () => {
+    const account = await signUp()
+
+    const result = await getMe(account.token)
+
+    expect(result.status).toBe(200)
+    expect(result.body.email).toBe(account.user.email)
   })
 })
 
@@ -199,5 +220,63 @@ describe('PATCH /v1/users/me', () => {
     })
 
     expect(res.status).toBe(422)
+  })
+})
+
+describe('GET /v1/users/:username', () => {
+  it('returns another user profile without exposing email', async () => {
+    const accountA = await signUp()
+    const accountB = await signUp()
+
+    const result = await getProfile(accountB.user.username, accountA.token)
+
+    expect(result.status).toBe(200)
+    expect(result.body.username).toBe(accountB.user.username)
+    expect(result.body).not.toHaveProperty('email')
+    expect(result.body.relationship).toEqual({
+      following: false,
+      followedBy: false,
+      blocking: false,
+    })
+  })
+
+  it('returns null relationship when viewing own profile', async () => {
+    const account = await signUp()
+
+    const result = await getProfile(account.user.username, account.token)
+
+    expect(result.status).toBe(200)
+    expect(result.body.relationship).toBeNull()
+  })
+
+  it('returns 404 problem+json for an unknown username', async () => {
+    const account = await signUp()
+
+    const result = await getProfile(`nobody_${uid()}`, account.token)
+
+    expect(result.status).toBe(404)
+    expect(result.headers['content-type']).toMatch(/application\/problem\+json/)
+  })
+
+  it('returns 401 without an access token', async () => {
+    const account = await signUp()
+
+    const result = await getProfile(account.user.username)
+
+    expect(result.status).toBe(401)
+  })
+
+  it('returns 404 for a username that cannot exists', async () => {
+    const account = await signUp()
+
+    const invalid = await getProfile('Ada', account.token)
+    const unknown = await getProfile(`nobody_${uid()}`, account.token)
+
+    expect(invalid.status).toBe(404)
+    expect(unknown.status).toBe(404)
+    expect({ title: invalid.body.title, detail: invalid.body.detail }).toEqual({
+      title: unknown.body.title,
+      detail: unknown.body.detail,
+    })
   })
 })

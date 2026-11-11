@@ -41,3 +41,10 @@ export class InvalidRefreshToken extends Error {
     this.name = 'InvalidRefreshToken'
   }
 }
+
+export class UserNotFound extends Error {
+  constructor() {
+    super('User not found')
+    this.name = 'UserNotFound'
+  }
+}

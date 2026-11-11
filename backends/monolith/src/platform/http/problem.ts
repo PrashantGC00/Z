@@ -57,6 +57,10 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
   }
 
   if (error?.status === 400 && Array.isArray(error.errors)) {
+    const onlyPathParams = error.errors.every((e: { path: string }) => e.path.startsWith('/params/'))
+    if (onlyPathParams) {
+      return send(res, { type: 'about:blank', title: 'Not Found', status: 404, ...base })
+    }
     return send(res, {
       type: 'about:blank',
       title: 'Validation failed',

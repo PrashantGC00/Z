@@ -265,13 +265,14 @@ paths:
       tags: [Users]
       operationId: getUserProfile
       summary: Get a profile by username
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       responses:
         "200":
           description: Profile.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UserProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /users/{username}/posts:
     parameters: [{ $ref: "#/components/parameters/Username" }]

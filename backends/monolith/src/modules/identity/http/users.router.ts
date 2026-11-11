@@ -1,12 +1,19 @@
 import { Router, type NextFunction, type Request, type RequestHandler, type Response } from 'express'
 import type { makeGetMe } from '../application/get-me.ts'
-import { toMe, toProblem } from './presenters.ts'
+import { toMe, toProblem, toProfile } from './presenters.ts'
 import type { makeUpdateMe } from '../application/update-me.ts'
+import type { makeGetUserProfile } from '../application/get-user-profile.ts'
 
 type GetMe = ReturnType<typeof makeGetMe>
 type UpdateMe = ReturnType<typeof makeUpdateMe>
+type GetUserProfile = ReturnType<typeof makeGetUserProfile>
 
-export const makeUserRouter = (deps: { getMe: GetMe; requireAuth: RequestHandler; updateMe: UpdateMe }): Router => {
+export const makeUserRouter = (deps: {
+  getMe: GetMe
+  requireAuth: RequestHandler
+  updateMe: UpdateMe
+  getUserProfile: GetUserProfile
+}): Router => {
   const router = Router()
   //GET /users/me
   router.get('/users/me', deps.requireAuth, async (req, res) => {
@@ -17,6 +24,11 @@ export const makeUserRouter = (deps: { getMe: GetMe; requireAuth: RequestHandler
   router.patch('/users/me', deps.requireAuth, async (req, res) => {
     const user = await deps.updateMe(req.auth!.userId, req.body)
     res.json(toMe(user))
+  })
+
+  router.get('/users/:username', deps.requireAuth, async (req, res) => {
+    const { user, relationship } = await deps.getUserProfile(req.auth!.userId, req.params.username as string)
+    res.json(toProfile(user, relationship))
   })
 
   router.use((err: unknown, _req: Request, _res: Response, next: NextFunction) => next(toProblem(err)))
