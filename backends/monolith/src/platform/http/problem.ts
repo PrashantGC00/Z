@@ -24,6 +24,7 @@ export class ProblemError extends Error {
     readonly title: string,
     readonly detail?: string,
     readonly errors?: ProblemDetails['errors'],
+    readonly headers?: Record<string, string>,
   ) {
     super(detail ?? title)
     this.name = 'ProblemError'

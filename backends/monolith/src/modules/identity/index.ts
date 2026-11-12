@@ -17,6 +17,9 @@ import { makeRefreshToken } from './application/refresh-tokens.ts'
 import { makeLogout } from './application/logout.ts'
 import { makeUpdateMe } from './application/update-me.ts'
 import { makeGetUserProfile } from './application/get-user-profile.ts'
+import { makeTokenBucket } from '../../platform/rate-limit.ts'
+import { redis } from '../../platform/redis.ts'
+import { rateLimit } from '../../platform/http/rate-limit.ts'
 
 const register = makeRegister({
   users: userRepository,
@@ -67,5 +70,14 @@ export const bearerAuth = async (req: Request): Promise<boolean> => {
   return true
 }
 
-export const identityRouter = makeAuthRouter({ register, login, refreshTokens, logout })
+const byIp = (req: Request) => req.ip ?? null
+const byEmail = (req: Request) => (typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : null)
+const limits = {
+  loginIp: rateLimit('login:ip', makeTokenBucket(redis, config.RATE_LIMIT_LOGIN_IP), byIp),
+  loginEmail: rateLimit('login:email', makeTokenBucket(redis, config.RATE_LIMIT_LOGIN_EMAIL), byEmail),
+  registerIp: rateLimit('register:ip', makeTokenBucket(redis, config.RATE_LIMIT_REGISTER_IP), byIp),
+  refreshIp: rateLimit('refresh:ip', makeTokenBucket(redis, config.RATE_LIMIT_REFRESH_IP), byIp),
+}
+
+export const identityRouter = makeAuthRouter({ register, login, refreshTokens, logout, limits })
 export const userRouter = makeUserRouter({ getMe, requireAuth, updateMe, getUserProfile })
