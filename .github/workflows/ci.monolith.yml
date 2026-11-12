@@ -26,6 +26,9 @@ jobs:
       S3_SECRET_KEY: ci
       S3_BUCKET: media
       OTEL_EXPORTER: http://localhost:4318/v1/traces
+      JWT_ISSUER: z-monolith
+      JWT_AUDIENCE: z
+      ACCESS_TOKEN_TTL_SECONDS: 900
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

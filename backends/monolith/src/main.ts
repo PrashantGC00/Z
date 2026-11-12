@@ -1,10 +1,12 @@
 import app from './app.ts'
 import { config } from './platform/config.ts'
 import { logger } from './platform/logger.ts'
+import { redis } from './platform/redis.ts'
 import { startShutdownHandlers } from './platform/shutdown.ts'
 
 const port = config.PORT
 
+await redis.connect()
 const server = app.listen(config.PORT, '0.0.0.0', () => {
   logger.info({ port }, 'server is running')
 })

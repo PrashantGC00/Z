@@ -2,6 +2,7 @@ import type { Server } from 'node:http'
 import { pool } from './db/client.js'
 import { logger } from './logger.js'
 import { telemetry } from './telemetry.js'
+import { redis } from './redis.ts'
 
 let shuttingDown = false
 export const isShuttingDown = () => shuttingDown
@@ -31,6 +32,7 @@ export const startShutdownHandlers = (server: Server) => {
 
       await pool.end()
       await telemetry.shutdown()
+      await redis.quit()
       logger.info('graceful shutdown completed')
       process.exit(0)
     } catch (err) {
