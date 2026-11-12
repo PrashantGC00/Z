@@ -1,10 +1,18 @@
 import { delay, http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { BACKENDS } from '@/config/backends'
 import { useSession } from '@/stores/session'
 import { api } from './client'
+import { statusOf } from './contract'
 import { ApiError, unwrap } from './errors'
+
+// The real x-status values change as backends flip operations to LIVE, so tests that need an
+// OFFLINE operation force it instead of depending on one that happens to be unbuilt.
+vi.mock('./contract', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./contract')>()
+  return { ...actual, statusOf: vi.fn(actual.statusOf) }
+})
 
 const base = BACKENDS.monolith.baseUrl
 const OLD = { accessToken: 'old-access', refreshToken: 'old-refresh', expiresIn: 900 }
@@ -101,6 +109,7 @@ describe('failures before the backend answers', () => {
       }),
     )
     useSession.setState({ respectStatus: true })
+    vi.mocked(statusOf).mockReturnValueOnce('OFFLINE')
     const error = await getMe().catch((e: unknown) => e)
     expect((error as ApiError).isOffline).toBe(true)
     expect(called).toBe(false)
