@@ -1,10 +1,17 @@
+import 'dotenv/config'
+import { db, pool } from '../client.ts'
+import { seed } from './users-seed.ts'
+
 async function main() {
-  console.log('nothing to seed for now.')
+  try {
+    await seed(db)
+    console.log('Seed completed successfully.')
+  } finally {
+    await pool.end()
+  }
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('Seed failed:', err)
-    process.exit(1)
-  })
+main().catch((error) => {
+  console.error('Seed failed:', error)
+  process.exitCode = 1
+})
