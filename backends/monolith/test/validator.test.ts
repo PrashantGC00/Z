@@ -20,4 +20,16 @@ describe('error contract (routes behind validateRequests)', () => {
     expect(Array.isArray(res.body.errors)).toBe(true)
     expect(res.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ field: 'password' })]))
   })
+
+  it('maps a missing JSON body to 422', async () => {
+    const res = await request(app).post('/v1/auth/register')
+    expect(res.status).toBe(422)
+    expect(res.body.errors[0].field).toBe('body')
+  })
+
+  it('maps malformed JSON to 422', async () => {
+    const res = await request(app).post('/v1/auth/register').set('Content-Type', 'application/json').send('{bad')
+    expect(res.status).toBe(422)
+    expect(res.headers['content-type']).toMatch(/^application\/problem\+json/)
+  })
 })

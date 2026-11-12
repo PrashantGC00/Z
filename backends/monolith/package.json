@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "migrate": "drizzle-kit migrate",
+    "generate": "drizzle-kit generate",
     "seed": "tsx src/platform/db/seed/seed.ts",
     "compose": "docker compose -f compose.monolith.yaml up -d --build",
     "down": "docker compose -f compose.monolith.yaml down",
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testcontainers/postgresql": "^12.2.1",
+    "@testcontainers/redis": "^12.2.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
@@ -41,6 +43,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "@opentelemetry/api": "^1.10.0",
     "@opentelemetry/auto-instrumentations-node": "^0.82.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.300.0",
@@ -53,9 +56,12 @@
     "express-openapi-validator": "^5.6.2",
     "helmet": "^8.3.0",
     "import-in-the-middle": "^3.5.2",
+    "ioredis": "^6.0.0",
+    "jose": "^6.2.15",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
+    "ulid": "^3.0.2",
     "zod": "^4.6.7"
   }
 }

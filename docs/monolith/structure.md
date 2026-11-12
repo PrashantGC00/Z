@@ -111,18 +111,22 @@ src/platform/
   telemetry.ts              OpenTelemetry SDK: HTTP, Express, pg, ioredis instrumentation
   http/
     problem.ts              ProblemError type and the single error-to-problem+json handler
-    validate.ts             express-openapi-validator wired to api/openapi.yaml
-    auth.ts                 Bearer JWT verification → req.user
+    validate.ts             express-openapi-validator wired to api/openapi.yaml; takes the
+                            bearerAuth security handler (from identity), so auth runs
+                            before body validation
     idempotency.ts          Idempotency-Key middleware (stores responses for 24 h)
     etag.ts                 ETag / If-Match helpers
     pagination.ts           Cursor encode/decode, limit clamp, page envelope
-    rate-limit.ts           Redis token bucket for login, register, refresh
+    rate-limit.ts           rateLimit(name, limiter, keyOf) middleware: 429 + Retry-After,
+                            fails open when Redis is down
+  rate-limit.ts             Token bucket in Redis (runs scripts/rate-limit.lua atomically)
   db/
     client.ts               pg pool + Drizzle instance
     schema.ts               Re-exports every module's infra/schema.ts for drizzle-kit
-    seed/seed.ts            Idempotent seed: demo account, users, follows, posts, media
+    seed/seed.ts            `pnpm seed` entry point; calls the seeders
+    seed/users-seed.ts      Idempotent: demo account, 20 users (follows, posts, media later)
     transaction.ts          Unit-of-work helper that also collects outbox events
-  redis.ts                  ioredis clients (commands, pub, sub)
+  redis.ts                  ioredis client (lazy connect, awaited before listen; pub/sub later)
   storage.ts                S3 client for MinIO, pre-signing helpers
   queue.ts                  BullMQ queue/worker factories with shared retry policy
   events/
@@ -148,7 +152,7 @@ src/platform/
 | Columns | snake_case; `*_id` for foreign keys; `created_at` | `author_id` |
 | Events | PascalCase past tense | `PostCreated`, `UserFollowed` |
 | Queues | kebab-case by purpose | `feed-fanout`, `media-process`, `outbox-relay` |
-| Redis keys | `colon:separated:{id}` | `timeline:{userId}`, `ratelimit:login:{ip}` |
+| Redis keys | `colon:separated:{id}` | `timeline:{userId}`, `rl:login:ip:{ip}` |
 | Env vars | SCREAMING_SNAKE, grouped by prefix | `DATABASE_URL`, `JWT_PRIVATE_KEY`, `S3_ENDPOINT` |
 
 ## Configuration (`.env.example`)
@@ -165,8 +169,11 @@ src/platform/
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | `z_monolith`, … | compose (Postgres container) |
 | `REDIS_URL` | `redis://localhost:6379` | all |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` | `http://localhost:9000`, … | main, worker |
-| `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `JWT_ISSUER`, `JWT_AUDIENCE` | PEM, `z-monolith`, `z` | main |
-| `ACCESS_TOKEN_TTL`, `REFRESH_TOKEN_TTL` | `15m`, `30d` | main |
+| `JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`, `JWT_ISSUER`, `JWT_AUDIENCE` | base64-encoded PEM, `z-monolith`, `z` | main |
+| `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_SECONDS` | `900`, `2592000` | main |
+| `RATE_LIMIT_DEFAULT` | `300/60` (`N/S` = N requests per S seconds, per key) | main (every `/v1` route, per IP) |
+| `RATE_LIMIT_LOGIN_IP`, `RATE_LIMIT_LOGIN_EMAIL` | `20/60`, `5/300` | main (`login`) |
+| `RATE_LIMIT_REGISTER_IP`, `RATE_LIMIT_REFRESH_IP` | `5/3600`, `60/60` | main (`register`, `refreshTokens`) |
 | `FEED_CELEBRITY_THRESHOLD`, `TIMELINE_MAX` | `10000`, `800` | worker, main |
 | `MEDIA_ADAPTER` | `local` (`remote` in the hybrid core) | main, worker |
 | `OTEL_EXPORTER` | `http://localhost:4318/v1/traces` | all (service name `z-monolith` is set in code) |
@@ -179,12 +186,15 @@ nginx :8081 (rate limit, body cap, request id)
   → CORS, helmet, JSON body parser
   → pino-http access log (request id from X-Request-Id or a new UUID)
   → request-context (request id, AsyncLocalStorage; trace id from the active span)
-  → /v1/health, /livez, /readyz (mounted before the validator)
-  → openapi validator (shape of params, query and body)
-  → auth (JWT → req.user) where the operation needs it
+  → /v1/health, /livez, /readyz (mounted before the rate limit and the validator)
+  → default rate limit (per IP, every /v1 route; 429 + Retry-After)
+  → openapi validator: first auth (bearerAuth handler, JWT → req.auth) where the
+    operation's security needs it, then the shape of params, query and body
+  → route rate limits (login per IP and per email, register, refresh)
   → idempotency / If-Match where the operation uses them
   → module router → use case → repositories (one transaction + outbox rows)
   → presenter → JSON response
   → 404 catch-all (problem+json) for routes nothing matched
-  → problem handler for anything thrown (validator errors become 422 with errors[])
+  → problem handler for anything thrown (validator errors become 422 with errors[], or 404
+    when only path params are invalid; every 401 carries the same detail)
 ```

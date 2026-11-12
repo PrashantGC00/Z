@@ -147,7 +147,7 @@ paths:
       operationId: register
       summary: Create an account
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -161,13 +161,14 @@ paths:
               schema: { $ref: "#/components/schemas/AuthSession" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /auth/login:
     post:
       tags: [Auth]
       operationId: login
       summary: Sign in with email and password
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -180,6 +181,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AuthSession" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/TooManyRequests" }
   /auth/refresh:
     post:
@@ -188,7 +190,7 @@ paths:
       summary: Rotate the refresh token
       description: Refresh tokens are single use. Presenting a used token revokes the whole token family (reuse detection).
       security: []
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -205,12 +207,15 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AuthTokens" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
   /auth/logout:
     post:
       tags: [Auth]
       operationId: logout
       summary: Revoke the current refresh token
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      security: []
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -222,6 +227,7 @@ paths:
                 refreshToken: { type: string }
       responses:
         "204": { description: Signed out. }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
 
   # ───────────────────────────── Users ─────────────────────────────
   /users/me:
@@ -229,7 +235,7 @@ paths:
       tags: [Users]
       operationId: getMe
       summary: Get the signed-in user
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       responses:
         "200":
           description: The signed-in user.
@@ -241,7 +247,7 @@ paths:
       tags: [Users]
       operationId: updateMe
       summary: Update profile
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       requestBody:
         required: true
         content:
@@ -253,6 +259,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /users/{username}:
     parameters: [{ $ref: "#/components/parameters/Username" }]
@@ -260,13 +267,14 @@ paths:
       tags: [Users]
       operationId: getUserProfile
       summary: Get a profile by username
-      x-status: { monolith: OFFLINE, microservices: OFFLINE, hybrid: OFFLINE }
+      x-status: { monolith: LIVE, microservices: OFFLINE, hybrid: OFFLINE }
       responses:
         "200":
           description: Profile.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UserProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /users/{username}/posts:
     parameters: [{ $ref: "#/components/parameters/Username" }]

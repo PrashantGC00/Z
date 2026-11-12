@@ -8,6 +8,27 @@
       "when": 1792947429777,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793772498797,
+      "tag": "0001_enable_citext",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793776258873,
+      "tag": "0002_users_table_init",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793777883170,
+      "tag": "0003_credentias_and_refresh_tokens",
+      "breakpoints": true
     }
   ]
 }

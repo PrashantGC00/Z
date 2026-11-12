@@ -1,0 +1,9 @@
+# Schemathesis config for `pnpm test:contract` (api/contract-test.ts), read from the repo root.
+#
+# Some rejections are business rules the schema can't express, so a schema-valid request can
+# still correctly get a 422. Allow that per operation, never globally.
+
+# Media ids are rejected until uploads exist (phase 4); after that, unknown ids still are.
+[[operations]]
+include-name = "PATCH /users/me"
+checks.positive_data_acceptance.expected-statuses = ["2xx", "401", "403", "404", "409", "422", "429"]

@@ -2,6 +2,7 @@ import type { ErrorRequestHandler, Response } from 'express'
 import { STATUS_CODES } from 'node:http'
 import { logger } from '../logger.js'
 import { getTraceId } from '../request-context.js'
+import { DrizzleQueryError } from 'drizzle-orm'
 
 export type ProblemDetails = {
   type: string
@@ -13,6 +14,8 @@ export type ProblemDetails = {
   errors?: Array<{ field: string; message: string }> | undefined
 }
 
+export const UNAUTHORIZED_DETAIL = 'Missing or invalid access token'
+
 export class ProblemError extends Error {
   readonly type = 'about:blank'
 
@@ -21,6 +24,7 @@ export class ProblemError extends Error {
     readonly title: string,
     readonly detail?: string,
     readonly errors?: ProblemDetails['errors'],
+    readonly headers?: Record<string, string>,
   ) {
     super(detail ?? title)
     this.name = 'ProblemError'
@@ -40,7 +44,24 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
     res.set(error.headers)
   }
 
+  const badJson = error?.type === 'entity.parse.failed'
+  const notJson = error?.status === 415
+
+  if (badJson || notJson) {
+    return send(res, {
+      type: 'about:blank',
+      title: 'Validation failed',
+      status: 422,
+      errors: [{ field: 'body', message: badJson ? 'must be valid JSON' : 'must be application/json' }],
+      ...base,
+    })
+  }
+
   if (error?.status === 400 && Array.isArray(error.errors)) {
+    const onlyPathParams = error.errors.every((e: { path: string }) => e.path.startsWith('/params/'))
+    if (onlyPathParams) {
+      return send(res, { type: 'about:blank', title: 'Not Found', status: 404, ...base })
+    }
     return send(res, {
       type: 'about:blank',
       title: 'Validation failed',
@@ -67,7 +88,9 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
   const status = typeof error?.status === 'number' && error.status >= 400 && error.status < 600 ? error.status : 500
 
   if (status >= 500) {
-    logger.error({ err: error, ...base }, 'unhandled error')
+    const logged = error instanceof DrizzleQueryError ? error.cause : error
+
+    logger.error({ err: logged, ...base }, 'unhandled error')
     return send(res, { type: 'about:blank', title: 'Internal Server Error', status, ...base })
   }
 
@@ -75,6 +98,7 @@ export const problemHandler: ErrorRequestHandler = (error, req, res, next) => {
     type: 'about:blank',
     title: STATUS_CODES[status] ?? 'Error',
     status,
+    ...(status === 401 && { detail: UNAUTHORIZED_DETAIL }),
     ...base,
   })
 }

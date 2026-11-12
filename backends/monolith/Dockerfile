@@ -19,6 +19,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /out ./
 COPY --from=build --chown=node:node /app/backends/monolith/dist ./dist
 COPY --from=build /app/api/openapi.yaml ./api/openapi.yaml
+COPY --from=build --chown=node:node /app/backends/monolith/scripts ./scripts
 ENV OPENAPI_SPEC=/app/api/openapi.yaml
 
 USER node

@@ -26,6 +26,9 @@ jobs:
       S3_SECRET_KEY: ci
       S3_BUCKET: media
       OTEL_EXPORTER: http://localhost:4318/v1/traces
+      JWT_ISSUER: z-monolith
+      JWT_AUDIENCE: z
+      ACCESS_TOKEN_TTL_SECONDS: 900
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,6 +37,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+
+      - name: Generate throwaway JWT key pair
+        run: |
+          openssl genpkey -algorithm ed25519 -out "$RUNNER_TEMP/jwt.pem"
+          openssl pkey -in "$RUNNER_TEMP/jwt.pem" -pubout -out "$RUNNER_TEMP/jwt.pub.pem"
+          echo "JWT_PRIVATE_KEY=$(base64 -w0 "$RUNNER_TEMP/jwt.pem")" >> "$GITHUB_ENV"
+          echo "JWT_PUBLIC_KEY=$(base64 -w0 "$RUNNER_TEMP/jwt.pub.pem")" >> "$GITHUB_ENV"
 
       - name: Install
         run: pnpm install --frozen-lockfile
