@@ -1,13 +1,19 @@
+import { eq } from 'drizzle-orm'
+import { describe, expect, it } from 'vitest'
 import { newId } from '../../../platform/ids.ts'
+import { db } from '../../../platform/db/client.ts'
+import { isUniqueViolation } from '../../../platform/db/errors.ts'
 import { refreshTokenGenerator } from './refresh-token-generator.ts'
 import { refreshTokenRepository } from './refresh-token.repository.ts'
-import { describe, expect, it } from 'vitest'
-import { db } from '../../../platform/db/client.ts'
 import { refreshTokens } from './schema.ts'
-import { eq } from 'drizzle-orm'
 import { userRepository } from './user.repository.ts'
-import { build } from '../../../../test/helpers.ts'
-import { isUniqueViolation } from '../../../platform/db/errors.ts'
+import { build, NOW } from '../../../../test/helpers.ts'
+
+const nextToken = (tokenHash: Buffer) => ({
+  id: newId(),
+  tokenHash,
+  expiresAt: new Date(NOW.getTime() + 60 * 60 * 1000),
+})
 
 describe('refreshTokenRepository', () => {
   it('creates a refresh token row', async () => {
@@ -54,6 +60,7 @@ describe('refreshTokenRepository', () => {
       expiresAt: new Date(Date.now() + 60_000),
       userId: account.user.id,
     }
+
     const tokenB = {
       id: newId(),
       familyId: secondFamilyId,
@@ -270,5 +277,108 @@ describe('revokeFamily', () => {
     const result = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
 
     expect(result?.revokedAt).toEqual(firstNow)
+  })
+})
+
+describe('rotate', () => {
+  it('returns the userId and familyId of the claimed token', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    const result = await refreshTokenRepository.rotate(
+      account.refreshToken.tokenHash,
+      nextToken(refreshTokenGenerator.generate().tokenHash),
+      NOW,
+    )
+
+    expect(result).toEqual({
+      userId: account.user.id,
+      familyId: account.refreshToken.familyId,
+    })
+  })
+
+  it('inserts the next token into the same family', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    const next = nextToken(refreshTokenGenerator.generate().tokenHash)
+
+    await refreshTokenRepository.rotate(account.refreshToken.tokenHash, next, NOW)
+
+    const result = await refreshTokenRepository.findByHash(next.tokenHash)
+
+    expect(result).toEqual({
+      familyId: account.refreshToken.familyId,
+      usedAt: null,
+      revokedAt: null,
+    })
+  })
+
+  it('marks the old token as used', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    await refreshTokenRepository.rotate(
+      account.refreshToken.tokenHash,
+      nextToken(refreshTokenGenerator.generate().tokenHash),
+      NOW,
+    )
+
+    const result = await refreshTokenRepository.findByHash(account.refreshToken.tokenHash)
+
+    expect(result?.usedAt).toEqual(NOW)
+  })
+
+  it('does not insert another token when the old token was already used', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    const oldHash = account.refreshToken.tokenHash
+
+    await refreshTokenRepository.rotate(oldHash, nextToken(refreshTokenGenerator.generate().tokenHash), NOW)
+
+    const secondNext = nextToken(refreshTokenGenerator.generate().tokenHash)
+
+    const result = await refreshTokenRepository.rotate(oldHash, secondNext, NOW)
+
+    expect(result).toBeNull()
+
+    expect(await refreshTokenRepository.findByHash(secondNext.tokenHash)).toBeNull()
+  })
+
+  it('rolls back the old token claim when inserting the next token fails', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    const oldHash = account.refreshToken.tokenHash
+    const existing = nextToken(refreshTokenGenerator.generate().tokenHash)
+
+    await refreshTokenRepository.create({
+      ...existing,
+      userId: account.user.id,
+      familyId: account.refreshToken.familyId,
+    })
+
+    await expect(refreshTokenRepository.rotate(oldHash, nextToken(existing.tokenHash), NOW)).rejects.toSatisfy((err) =>
+      isUniqueViolation(err, 'refresh_tokens_token_hash_unique'),
+    )
+
+    const oldToken = await refreshTokenRepository.findByHash(oldHash)
+
+    expect(oldToken?.usedAt).toBeNull()
+  })
+
+  it('allows only one rotation when two requests race', async () => {
+    const account = build()
+    await userRepository.createAccount(account)
+
+    const oldHash = account.refreshToken.tokenHash
+
+    const results = await Promise.all([
+      refreshTokenRepository.rotate(oldHash, nextToken(refreshTokenGenerator.generate().tokenHash), NOW),
+      refreshTokenRepository.rotate(oldHash, nextToken(refreshTokenGenerator.generate().tokenHash), NOW),
+    ])
+
+    expect(results.filter((result) => result !== null)).toHaveLength(1)
   })
 })

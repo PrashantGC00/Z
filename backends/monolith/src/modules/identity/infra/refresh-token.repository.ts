@@ -43,4 +43,34 @@ export const refreshTokenRepository: RefreshTokenRepository = {
       .set({ revokedAt: now })
       .where(and(eq(refreshTokens.familyId, familyId), isNull(refreshTokens.revokedAt)))
   },
+
+  async rotate(presentedHash, next, now) {
+    return db.transaction(async (tx) => {
+      const [claimed] = await tx
+        .update(refreshTokens)
+        .set({ usedAt: now })
+        .where(
+          and(
+            eq(refreshTokens.tokenHash, presentedHash),
+            isNull(refreshTokens.usedAt),
+            isNull(refreshTokens.revokedAt),
+            gt(refreshTokens.expiresAt, now),
+          ),
+        )
+        .returning({
+          userId: refreshTokens.userId,
+          familyId: refreshTokens.familyId,
+        })
+
+      if (!claimed) return null
+
+      await tx.insert(refreshTokens).values({
+        ...next,
+        userId: claimed.userId,
+        familyId: claimed.familyId,
+      })
+
+      return claimed
+    })
+  },
 }
