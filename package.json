@@ -28,12 +28,12 @@
     "down:microservices": "docker compose -f backends/microservices/deploy/compose/docker-compose.yaml down"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.71.0",
+    "@redocly/cli": "^2.82.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/swagger-ui-express": "^4.1.8",
     "husky": "^9.1.7",
-    "lint-staged": "^17.6.0",
+    "lint-staged": "^17.6.1",
     "typescript": "~6.0.3"
   },
   "dependencies": {
